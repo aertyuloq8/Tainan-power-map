@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>電費試算</title>
+  <style>
+    :root { --line-green: #1DB446; --summer-orange: #E67E22; --non-blue: #2E86C1; --bg-gray: #f0f2f5; }
+    body { font-family: -apple-system, sans-serif; padding: 10px; background-color: var(--bg-gray); color: #333; margin: 0; }
+    .container { max-width: 500px; margin: auto; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    
+    /* 頁籤 */
+    .tabs { display: flex; margin-bottom: 15px; background: #eee; border-radius: 8px; padding: 4px; }
+    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 6px; color: #666; font-weight: bold; font-size: 14px; }
+    .tab.active { background: white; color: var(--line-green); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    
+    /* 輸入欄位 */
+    .form-group { margin-bottom: 12px; }
+    label { display: block; margin-bottom: 5px; font-size: 14px; font-weight: bold; color: #555; }
+    input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
+    .btn-calc { width: 100%; padding: 15px; background: var(--line-green); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+    
+    /* 結果卡片樣式 */
+    #result-area { margin-top: 20px; display: none; background: #fff; border: 1px solid #e0e0e0; border-radius: 15px; padding: 15px; }
+    .card-header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .card-title { font-size: 18px; font-weight: bold; color: var(--line-green); }
+    .card-price { font-size: 38px; font-weight: bold; color: #ff4d4f; margin: 5px 0; }
+    .price-unit { font-size: 14px; color: #aaa; font-weight: normal; }
+    
+    /* 數據方塊 */
+    .info-box { background: #f9f9f9; border-radius: 10px; padding: 12px; margin: 10px 0; font-size: 14px; }
+    .row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .row b { color: var(--non-blue); }
+    
+    /* 明細區塊 */
+    .detail-title { font-size: 13px; font-weight: bold; color: #888; margin: 15px 0 8px 5px; }
+    .tier-box { background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .tier-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+    .sub-row { display: flex; font-size: 12px; color: #666; margin-top: 3px; align-items: center; }
+    .tag { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 8px; color: white; }
+    .tag-summer { background: var(--summer-orange); }
+    .tag-non { background: var(--non-blue); }
+    
+    .hidden { display: none; }
+    .footer-note { font-size: 11px; color: #bbb; text-align: center; margin-top: 20px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="tabs">
+    <div id="tab-bill" class="tab active" onclick="switchTab('bill')">💰 電費試算</div>
+    <div id="tab-avg" class="tab" onclick="switchTab('avg')">📊 日均試算</div>
+  </div>
+
+  <div class="form-group">
+    <label>🏢 用電種類</label>
+    <select id="bill-type">
+      <option value="HOME">🏠 住家 (非營業)</option>
+      <option value="BIZ">🏢 營業 (小商店)</option>
+      <option value="TEMP">⚡ 臨時電</option>
+    </select>
+  </div>
+
+  <div id="form-bill">
+    <div class="form-group"><label>⚡ 用電度數</label><input type="number" id="b-kwh" placeholder="請輸入總度數"></div>
+    <div class="form-group"><label>📅 起始日期</label><input type="date" id="b-start"></div>
+    <div class="form-group"><label>📅 結束日期</label><input type="date" id="b-end"></div>
+  </div>
+
+  <div id="form-avg" class="hidden">
+    <div class="form-group"><label>📖 上次指數</label><input type="number" id="a-lastIdx"></div>
+    <div class="form-group"><label>📖 本次指數</label><input type="number" id="a-currIdx"></div>
+    <div class="form-group"><label>📅 上次日期</label><input type="date" id="a-lastDate"></div>
+    <div class="form-group"><label>📅 本次日期</label><input type="date" id="a-currDate"></div>
+  </div>
+
+  <button class="btn-calc" onclick="runCalculation()">🚀 立即計算結果</button>
+
+  <div id="result-area">
+    </div>
+
+  <div class="footer-note">
+    費率依據：114年10月1日實施<br>
+    ※ 試算結果僅供參考，實際金額以台電帳單為準。
+  </div>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<script>
+  let currentMode = 'bill';
+  const CONFIG = {
+    HOME: { name: "🏠 住家試算", tiers: [240, 660, 1000, 1400, 2000], summer: [1.78, 2.55, 3.80, 5.14, 6.44, 8.86], nonSummer: [1.78, 2.26, 3.13, 4.24, 5.27, 7.03] },
+    BIZ: { name: "🏢 營業試算", tiers: [660, 1400, 3000, 6000], summer: [2.71, 3.76, 4.46, 7.08, 7.43], nonSummer: [2.28, 3.10, 3.61, 5.56, 5.83] },
+    TEMP: { name: "⚡ 臨時電試算", tiers: [660, 1400, 3000, 6000], summer: [4.336, 6.016, 7.136, 11.328, 11.888], nonSummer: [3.648, 4.960, 5.776, 8.896, 9.328] }
+  };
+
+  // ★ 新增：LIFF 初始化邏輯 (從 Config.gs 自動抓取變數)
+  async function initLiff() {
+    try {
+      await liff.init({ liffId: "2009264862-yWLlZr8z" }); 
+      
+      // 依據 URL 參數自動切換頁籤 (?mode=avg)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mode') === 'avg') switchTab('avg');
+    } catch (err) {
+      console.log("LIFF Init Failed", err);
+    }
+  }
+
+  function switchTab(mode) {
+    currentMode = mode;
+    document.getElementById('tab-bill').classList.toggle('active', mode === 'bill');
+    document.getElementById('tab-avg').classList.toggle('active', mode === 'avg');
+    document.getElementById('form-bill').classList.toggle('hidden', mode === 'avg');
+    document.getElementById('form-avg').classList.toggle('hidden', mode === 'bill');
+    document.getElementById('result-area').style.display = 'none';
+  }
+
+  // 預設今天
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('b-end').value = today;
+  document.getElementById('a-currDate').value = today;
+
+  function runCalculation() {
+    let kwh, start, end, avgInfo = null;
+    const typeKey = document.getElementById('bill-type').value;
+    const config = CONFIG[typeKey];
+
+    if (currentMode === 'bill') {
+      kwh = parseFloat(document.getElementById('b-kwh').value);
+      start = new Date(document.getElementById('b-start').value);
+      end = new Date(document.getElementById('b-end').value);
+    } else {
+      const lIdx = parseFloat(document.getElementById('a-lastIdx').value);
+      const cIdx = parseFloat(document.getElementById('a-currIdx').value);
+      kwh = cIdx - lIdx;
+      start = new Date(document.getElementById('a-lastDate').value);
+      end = new Date(document.getElementById('a-currDate').value);
+      avgInfo = { last: lIdx, curr: cIdx };
+    }
+
+    if (isNaN(kwh) || !start.getTime() || !end.getTime()) { alert("⚠️ 請填寫完整資料"); return; }
+
+    const totalDays = Math.ceil((end - start) / 86400000) || 1;
+    let summerDays = 0;
+    let tempDate = new Date(start);
+    for (let i = 0; i < totalDays; i++) {
+      let m = tempDate.getMonth() + 1;
+      if (m >= 6 && m <= 9) summerDays++;
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+    const nonSummerDays = totalDays - summerDays;
+    const ratioS = summerDays / totalDays;
+    const ratioN = nonSummerDays / totalDays;
+
+    let totalBill = 0;
+    let rem = kwh;
+    let detailsHtml = "";
+
+    for (let i = 0; i < config.summer.length; i++) {
+      let limit = config.tiers[i] || null;
+      let prev = config.tiers[i-1] || 0;
+      let rangeKwh = (limit === null) ? rem : Math.min(rem, limit - prev);
+      
+      if (rangeKwh > 0) {
+        let label = (limit === null) ? `${prev + 1}度以上` : (i === 0 ? `1~${limit}度` : `${prev + 1}~${limit}度`);
+        let costS = rangeKwh * ratioS * config.summer[i];
+        let costN = rangeKwh * ratioN * config.nonSummer[i];
+        let sub = Math.round(costS + costN);
+        totalBill += (costS + costN);
+
+        detailsHtml += `
+          <div class="tier-box">
+            <div class="tier-header"><span>${label} (${rangeKwh.toFixed(1)}度)</span><span>$${sub.toLocaleString()}</span></div>
+            ${summerDays > 0 ? `<div class="sub-row"><span class="tag tag-summer">夏月</span> ${ (rangeKwh * ratioS).toFixed(1) }度 x ${config.summer[i]} = $${Math.round(costS)}</div>` : ''}
+            ${nonSummerDays > 0 ? `<div class="sub-row"><span class="tag tag-non">非夏月</span> ${ (rangeKwh * ratioN).toFixed(1) }度 x ${config.nonSummer[i]} = $${Math.round(costN)}</div>` : ''}
+          </div>
+        `;
+        rem -= rangeKwh;
+      }
+    }
+
+    const resultArea = document.getElementById('result-area');
+    resultArea.style.display = "block";
+    resultArea.innerHTML = `
+      <div class="card-header">
+        <div class="card-title">${config.name}結果</div>
+        <div class="card-price">$${Math.round(totalBill).toLocaleString()}<span class="price-unit"> 流動電費</span></div>
+      </div>
+      <div class="info-box">
+        ${avgInfo ? `<div class="row"><span>上次指數</span><span>${avgInfo.last}</span></div><div class="row"><span>本次指數</span><span>${avgInfo.curr}</span></div>` : ''}
+        <div class="row"><b>📊 日均度數</b><b>${(kwh/totalDays).toFixed(2)} 度/日</b></div>
+        <div class="row"><span>總用電量</span><span>${kwh.toLocaleString()} 度</span></div>
+        <div class="row"><span>計算天數</span><span>${totalDays} 天</span></div>
+        <div class="row"><span>天數分佈</span><span>🌞${summerDays}天 / 🌬️${nonSummerDays}天</span></div>
+      </div>
+      <div class="detail-title">費用分攤明細</div>
+      ${detailsHtml}
+    `;
+    
+    resultArea.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // 執行初始化
+  initLiff();
+</script>
+</body>
+</html>
