@@ -129,14 +129,17 @@
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       window.baseMaps = { "深色模式": darkLayer, "一般街道": streetLayer };
 
-      // 左上角重整按鈕 (點擊重新選取區段)
+      // ★ 左上角重整按鈕 (點擊清除圖層記憶並重新選取)
       var ReloadControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function() {
           var div = L.DomUtil.create('div', 'leaflet-control-reload');
           div.innerHTML = '🔄';
           div.title = "重新選擇區段";
-          div.onclick = function() { location.reload(); }; 
+          div.onclick = function() { 
+            localStorage.removeItem('last_selected_prefixes'); // 清除勾選記憶
+            location.reload(); 
+          }; 
           return div;
         }
       });
@@ -208,17 +211,34 @@
       }
     }
 
-    // 將清單畫成核取方塊
+    // ==========================================
+    // 將清單畫成核取方塊，並檢查是否有「上次的記憶」
+    // ==========================================
     function renderPrefixes(prefixes) {
       const container = document.getElementById('prefix-container');
       container.innerHTML = ''; 
       
+      // 🧠 1. 讀取大腦裡「上次勾選了哪些區段」
+      let lastSelected = [];
+      try {
+        const saved = localStorage.getItem('last_selected_prefixes');
+        if (saved) lastSelected = JSON.parse(saved);
+      } catch (e) {}
+
+      // 2. 產生核取方塊
       prefixes.forEach(prefix => {
         const label = document.createElement('label');
         label.className = 'prefix-label';
-        label.innerHTML = `<input type="checkbox" value="${prefix}"> ${prefix}`;
+        // 如果這個區段在上次的記憶裡，就幫它加上 checked 自動打勾
+        const isChecked = lastSelected.includes(prefix) ? 'checked' : '';
+        label.innerHTML = `<input type="checkbox" value="${prefix}" ${isChecked}> ${prefix}`;
         container.appendChild(label);
       });
+
+      // 🚀 3. 如果有記憶，直接幫使用者自動按下「確認載入」！
+      if (lastSelected.length > 0) {
+        startLoadingData();
+      }
     }
 
     // 手動強制清除快取並重新掃描資料庫
@@ -248,6 +268,9 @@
         alert("請至少選擇一個區段！");
         return;
       }
+
+      // 💾 ★ 把這次勾選的區段，存進大腦(快取)裡！
+      localStorage.setItem('last_selected_prefixes', JSON.stringify(selectedPrefixes));
 
       document.getElementById('prefix-modal').style.display = 'none';
       document.getElementById('loading').style.display = 'flex';
