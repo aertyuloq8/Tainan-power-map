@@ -160,13 +160,22 @@
 // ★ 升級版：全自動向資料庫要「前 4 碼」清單
     async function buildPrefixModal() {
       const container = document.getElementById('prefix-container');
-      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 正在從 115 萬筆資料中掃描區段...</div>';
+      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 正在從資料中掃描區段...</div>';
 
       try {
         // 呼叫我們剛剛在 Supabase 建立的自訂函數 (RPC)
         const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_unique_prefixes`, {
-          headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+          method: 'POST',  // 🟢 關鍵修正 1：告訴 Supabase 我們要觸發函數
+          headers: { 
+            "apikey": SUPABASE_KEY, 
+            "Authorization": "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json" // 🟢 關鍵修正 2：確保格式正確
+          }
         });
+        
+        // 如果伺服器還是報錯，把它丟到 catch 去顯示
+        if (!response.ok) throw new Error("API 請求被拒絕"); 
+
         const data = await response.json();
         
         container.innerHTML = ''; // 清空載入文字
