@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>電號分佈圖</title>
+  <title>電號分佈圖 (自選區段版)</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -20,10 +20,11 @@
     body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; }
     #map { width: 100vw; height: 100vh; background: #222; }
     
+    /* 載入畫面 */
     #loading {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.9); z-index: 9999;
-      display: flex; flex-direction: column;
+      background: rgba(0, 0, 0, 0.9); z-index: 9998;
+      display: none; flex-direction: column;
       justify-content: center; align-items: center; color: white;
     }
     .spinner {
@@ -33,49 +34,57 @@
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    .zone-label {
-      background: rgba(255, 255, 255, 0.9); border: 2px solid #333;
-      border-radius: 4px; color: #000; font-weight: bold; font-size: 14px;
-      padding: 2px 6px; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-      white-space: nowrap;
+    /* ★ 新增：彈出選單的樣式 (針對手機優化) */
+    #prefix-modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85); z-index: 10000;
+      display: flex; justify-content: center; align-items: center;
     }
+    .modal-content {
+      background: #fff; width: 90%; max-width: 400px;
+      border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      max-height: 80vh; display: flex; flex-direction: column;
+    }
+    .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #1DB446; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+    .prefix-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      overflow-y: auto; padding: 10px 0; margin-bottom: 15px;
+    }
+    .prefix-label {
+      background: #f0f2f5; padding: 8px 5px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+      cursor: pointer; border: 1px solid #ddd; font-weight: bold; color: #333;
+    }
+    .prefix-label input { margin-right: 5px; width: 18px; height: 18px; }
+    .modal-footer { display: flex; justify-content: space-between; gap: 10px; }
+    .btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+    .btn-all { background: #e0e0e0; color: #333; }
+    .btn-submit { background: #1DB446; color: white; }
 
+    /* 地圖元件樣式 */
+    .zone-label { background: rgba(255, 255, 255, 0.9); border: 2px solid #333; border-radius: 4px; color: #000; font-weight: bold; font-size: 14px; padding: 2px 6px; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); white-space: nowrap; }
     .info-box { font-size: 14px; line-height: 1.6; min-width: 180px; }
-    .info-btn { 
-      display: block; margin-top: 10px; text-decoration: none; 
-      color: white !important; background: #1DB446; padding: 8px; 
-      text-align: center; border-radius: 4px; font-weight: bold;
-    }
-    .leaflet-control-reload {
-      background: white; width: 34px; height: 34px; border-radius: 4px;
-      cursor: pointer; display: flex; justify-content: center; align-items: center;
-      font-size: 18px; border: 2px solid rgba(0,0,0,0.2);
-    }
-
-    /* ★ 新增：全選控制面板的樣式 */
-    .master-toggle {
-      background: rgba(255, 255, 255, 0.95);
-      padding: 10px 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      font-size: 14px;
-      color: #333;
-      border: 2px solid rgba(0,0,0,0.2);
-    }
-    .master-toggle label {
-      cursor: pointer; display: flex; align-items: center; 
-      margin-top: 8px; font-weight: bold;
-    }
-    .master-toggle input {
-      margin-right: 8px; width: 16px; height: 16px; cursor: pointer;
-    }
-    .master-toggle-title {
-      font-weight: 900; color: #1DB446; border-bottom: 2px solid #ddd; 
-      padding-bottom: 5px; margin-bottom: 5px; text-align: center;
-    }
+    .info-btn { display: block; margin-top: 10px; text-decoration: none; color: white !important; background: #1DB446; padding: 8px; text-align: center; border-radius: 4px; font-weight: bold; }
+    .leaflet-control-reload { background: white; width: 34px; height: 34px; border-radius: 4px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 18px; border: 2px solid rgba(0,0,0,0.2); }
+    .master-toggle { background: rgba(255, 255, 255, 0.95); padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 14px; color: #333; border: 2px solid rgba(0,0,0,0.2); }
+    .master-toggle label { cursor: pointer; display: flex; align-items: center; margin-top: 8px; font-weight: bold; }
+    .master-toggle input { margin-right: 8px; width: 16px; height: 16px; cursor: pointer; }
+    .master-toggle-title { font-weight: 900; color: #1DB446; border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-bottom: 5px; text-align: center; }
   </style>
 </head>
 <body>
+
+  <div id="prefix-modal">
+    <div class="modal-content">
+      <div class="modal-header">⚡ 請選擇要載入的電號區段</div>
+      <div class="prefix-grid" id="prefix-container">
+        </div>
+      <div class="modal-footer">
+        <button class="btn btn-all" onclick="toggleAllPrefixes()">全選 / 清除</button>
+        <button class="btn btn-submit" onclick="startLoadingData()">🚀 確認載入</button>
+      </div>
+    </div>
+  </div>
 
   <div id="loading">
     <div class="spinner"></div>
@@ -96,138 +105,133 @@
     let layersRef = { heat: {}, markers: {} };
     let layerControl = null;
     let colorIndex = 0; 
+    let isAllSelected = false;
 
     async function initLiff() {
-      try {
-        await liff.init({ liffId: "2009264862-z2kqi1C3" });
-      } catch (err) { console.error("LIFF 初始化失敗", err); }
+      try { await liff.init({ liffId: "2009264862-z2kqi1C3" }); } catch (err) { console.error("LIFF 初始化失敗", err); }
     }
 
     function initMap() {
       const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CARTO', maxZoom: 20 });
       const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' });
 
-      map = L.map('map', {
-        center: [23.05, 120.2], zoom: 12, layers: [darkLayer], preferCanvas: true, zoomControl: false 
-      });
+      map = L.map('map', { center: [23.05, 120.2], zoom: 12, layers: [darkLayer], preferCanvas: true, zoomControl: false });
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       window.baseMaps = { "深色模式": darkLayer, "一般街道": streetLayer };
 
-      // 左上角：重整快取按鈕
+      // 左上角重整按鈕
       var ReloadControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function() {
           var div = L.DomUtil.create('div', 'leaflet-control-reload');
           div.innerHTML = '🔄';
-          div.title = "清除快取並重新載入";
-          div.onclick = function() {
-            if(confirm("確定要清除手機快取並重新下載所有資料嗎？")) {
-              localStorage.removeItem("power_data_cache");
-              location.reload();
-            }
-          };
+          div.title = "重新選擇區段";
+          div.onclick = function() { location.reload(); }; // 點擊直接重整網頁重新選
           return div;
         }
       });
       map.addControl(new ReloadControl());
 
-      // ★ 新增右上角：批次全選控制面板
+      // 右上角全選控制
       var MasterToggleControl = L.Control.extend({
         options: { position: 'topright' },
         onAdd: function() {
           var div = L.DomUtil.create('div', 'master-toggle');
-          div.innerHTML = `
-            <div class="master-toggle-title">🛠️ 快速全選控制</div>
+          div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</div>
             <label><input type="checkbox" id="toggle-all-heat" checked> 🟥 顯示所有熱力圖</label>
-            <label><input type="checkbox" id="toggle-all-markers"> 📍 顯示所有詳細點位</label>
-          `;
-          L.DomEvent.disableClickPropagation(div); // 防止點擊時穿透到地圖
+            <label><input type="checkbox" id="toggle-all-markers"> 📍 顯示所有詳細點位</label>`;
+          L.DomEvent.disableClickPropagation(div);
 
-          // 綁定全選/全取消事件
-          let heatCheckbox = div.querySelector('#toggle-all-heat');
-          let markerCheckbox = div.querySelector('#toggle-all-markers');
-
-          heatCheckbox.addEventListener('change', function(e) {
-            let isChecked = e.target.checked;
-            for (let key in layersRef.heat) {
-              if (isChecked) {
-                if (!map.hasLayer(layersRef.heat[key])) map.addLayer(layersRef.heat[key]);
-              } else {
-                if (map.hasLayer(layersRef.heat[key])) map.removeLayer(layersRef.heat[key]);
-              }
-            }
+          div.querySelector('#toggle-all-heat').addEventListener('change', function(e) {
+            for (let key in layersRef.heat) { e.target.checked ? map.addLayer(layersRef.heat[key]) : map.removeLayer(layersRef.heat[key]); }
           });
-
-          markerCheckbox.addEventListener('change', function(e) {
-            let isChecked = e.target.checked;
-            for (let key in layersRef.markers) {
-              if (isChecked) {
-                if (!map.hasLayer(layersRef.markers[key])) map.addLayer(layersRef.markers[key]);
-              } else {
-                if (map.hasLayer(layersRef.markers[key])) map.removeLayer(layersRef.markers[key]);
-              }
-            }
+          div.querySelector('#toggle-all-markers').addEventListener('change', function(e) {
+            for (let key in layersRef.markers) { e.target.checked ? map.addLayer(layersRef.markers[key]) : map.removeLayer(layersRef.markers[key]); }
           });
-
           return div;
         }
       });
       map.addControl(new MasterToggleControl());
 
-      checkCacheAndLoad();
+      // 產生選項清單
+      buildPrefixModal();
     }
 
-    function checkCacheAndLoad() {
-      // 1. 綁定「地圖滑動結束」或「縮放結束」的事件
-      map.on('moveend', function() {
-        // 🚨 保護機制：如果地圖縮得太小 (例如看到整個台南市)，強制不載入，避免瀏覽器當機
-        if (map.getZoom() < 14) {
-          document.getElementById('loading').style.display = 'flex';
-          document.getElementById('loading-text').innerHTML = "🔍 範圍太大！請放大地圖以顯示電桿";
-          
-          // 1.5 秒後隱藏提示
-          setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1500);
-          
-          // 清空畫面上的舊圖層
-          for (let key in layersRef.heat) map.removeLayer(layersRef.heat[key]);
-          for (let key in layersRef.markers) map.removeLayer(layersRef.markers[key]);
-          if (layerControl) map.removeControl(layerControl);
-          layersRef = { heat: {}, markers: {} };
-          return;
-        }
-        
-        // 級別夠大 (放得夠近)，開始抓取螢幕範圍內的資料
-        fetchDataByBounds();
-      });
-
-      // 2. 網頁剛打開時，手動觸發一次滑動事件，載入初始畫面
-      map.fire('moveend');
-    }
-
-    async function fetchDataByBounds() {
-      document.getElementById('loading').style.display = 'flex';
-      document.getElementById('loading-text').innerHTML = "🌐 讀取範圍內圖資...";
+// ★ 升級版：全自動向資料庫要「前 4 碼」清單
+    async function buildPrefixModal() {
+      const container = document.getElementById('prefix-container');
+      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 正在從 115 萬筆資料中掃描區段...</div>';
 
       try {
-        // 取得目前手機螢幕的「東、南、西、北」座標邊界
-        const bounds = map.getBounds();
-        const north = bounds.getNorth();
-        const south = bounds.getSouth();
-        const east = bounds.getEast();
-        const west = bounds.getWest();
-
-        // 🚨 終極魔法：告訴資料庫「只抓這個經緯度方塊裡面的資料！」
-        // 限制單次最多 3000 筆，保護你的手機不卡頓
-        const apiUrl = `${SUPABASE_URL}/rest/v1/power_data?lat=gte.${south}&lat=lte.${north}&lng=gte.${west}&lng=lte.${east}&select=power_no,civil_eng,lat,lng&limit=3000`;
-
-        const response = await fetch(apiUrl, {
+        // 呼叫我們剛剛在 Supabase 建立的自訂函數 (RPC)
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_unique_prefixes`, {
           headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
         });
+        const data = await response.json();
         
-        const json = await response.json();
+        container.innerHTML = ''; // 清空載入文字
         
-        // 把範圍內抓到的資料，丟給後面的程式去畫圖
-        const mappedData = json.map(r => [r.lat, r.lng, r.power_no || "", r.civil_eng || ""]);
+        // 把資料庫回傳的清單，一顆一顆做成核取方塊
+        data.forEach(item => {
+          const prefix = item.prefix;
+          if (!prefix) return;
+
+          const label = document.createElement('label');
+          label.className = 'prefix-label';
+          label.innerHTML = `<input type="checkbox" value="${prefix}"> ${prefix}`;
+          container.appendChild(label);
+        });
+      } catch (err) {
+        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: red;">❌ 讀取區段清單失敗，請檢查網路。</div>';
+        console.error("讀取清單失敗:", err);
+      }
+    }
+    // 全選/清除 按鈕邏輯
+    function toggleAllPrefixes() {
+      isAllSelected = !isAllSelected;
+      const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]');
+      checkboxes.forEach(cb => cb.checked = isAllSelected);
+    }
+
+    // ★ 核心魔法：根據勾選的項目去資料庫撈資料
+    async function startLoadingData() {
+      const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]:checked');
+      const selectedPrefixes = Array.from(checkboxes).map(cb => cb.value);
+
+      if (selectedPrefixes.length === 0) {
+        alert("請至少選擇一個區段！");
+        return;
+      }
+
+      // 隱藏選單，顯示 Loading
+      document.getElementById('prefix-modal').style.display = 'none';
+      document.getElementById('loading').style.display = 'flex';
+
+      try {
+        let allData = [];
+        let offset = 0;
+        let hasMore = true;
+        const limit = 10000;
+
+        // 組合資料庫查詢條件：告訴資料庫「只要符合這些開頭的就好！」
+        let orQuery = selectedPrefixes.map(p => `power_no.like.${p}*`).join(',');
+
+        while (hasMore) {
+          document.getElementById('loading-text').innerHTML = `🌐 下載指定圖資中... (已載入 ${allData.length} 筆)`;
+          
+          // 透過 or 條件，一次把勾選的區段全部撈回來
+          const apiUrl = `${SUPABASE_URL}/rest/v1/power_data?or=(${orQuery})&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}`;
+          
+          const response = await fetch(apiUrl, {
+            headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+          });
+          const json = await response.json();
+          allData = allData.concat(json);
+          
+          if (json.length < limit) hasMore = false; else offset += limit;
+        }
+
+        const mappedData = allData.map(r => [r.lat, r.lng, r.power_no || "", r.civil_eng || ""]);
         processData(mappedData);
 
       } catch (err) {
@@ -236,6 +240,7 @@
       }
     }
 
+    // 原封不動的顯示邏輯！
     function processData(data) {
       document.getElementById('loading-text').innerHTML = "🎨 繪製圖層中...";
 
@@ -310,7 +315,6 @@
         overlayMaps["📍 " + displayName + " 詳細點位"] = cluster;
       });
 
-      // 讓內建選單生成在全選面板的下方
       layerControl = L.control.layers(window.baseMaps, overlayMaps, { collapsed: true }).addTo(map);
       document.getElementById('loading').style.display = 'none';
     }
