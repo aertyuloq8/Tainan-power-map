@@ -287,7 +287,8 @@
         while (hasMore) {
           document.getElementById('loading-text').innerHTML = `🌐 下載指定資料中... (已載入 ${allData.length} 筆)`;
           
-          const apiUrl = `${SUPABASE_URL}/rest/v1/power_data?or=(${orQuery})&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}`;
+          // ✅ 加上排序指令的完美版網址
+           const apiUrl = `${SUPABASE_URL}/rest/v1/power_data?or=(${orQuery})&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}&order=power_no.asc`;
           
           const response = await fetch(apiUrl, {
             headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
