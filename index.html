@@ -439,9 +439,9 @@ div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</di
     window.onload = function() { initMap(); initLiff(); };
 
 // ==========================================
-    // ★ 上帝視角：讀取實體化視圖 (不使用叢集，標籤全開版)
+    // ★ 上帝視角：讀取實體化視圖 + 防重疊標籤叢集
     // ==========================================
-    let godModeLayer = L.layerGroup(); // 改回使用普通的 LayerGroup
+    let godModeCluster = null; // 用來存放防重疊的標籤群組
 
     async function loadGodModeLabels() {
       const btn = document.querySelector('button[onclick="loadGodModeLabels()"]');
@@ -452,48 +452,52 @@ div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</di
       btn.innerHTML = "⏳ 雲端計算中...";
       btn.style.background = "#f39c12";
 
-      // 1. 清除舊有的標籤圖層
-      if (godModeLayer) {
-        map.removeLayer(godModeLayer);
-        godModeLayer.clearLayers();
+      // 1. 如果地圖上已經有上帝視角圖層，就先清空它（避免按第二次疊加）
+      if (godModeCluster) {
+        map.removeLayer(godModeCluster);
       }
 
+      // 2. 建立一個「防重疊叢集」
+      godModeCluster = L.markerClusterGroup({
+        maxClusterRadius: 60,         // 距離 60 pixel 內的標籤會自動合併
+        disableClusteringAtZoom: 14,  // 當地圖放大到 14 級時，強制全部分開不合併
+        spiderfyOnMaxZoom: true       // 太擠的時候會像蜘蛛網一樣彈開
+      });
+
       try {
-        // 2. 從 Supabase 的實體化視圖拿資料
+        // 3. 向 Supabase 的實體化視圖要資料 (瞬間回傳)
         const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=*", "GET");
         let bounds = [];
 
-        // 3. 建立標籤並直接加入 LayerGroup
+        // 4. 把資料做成標籤，塞進防重疊叢集裡
         data.forEach(row => {
           let lbl = L.marker([row.center_lat, row.center_lng], { 
             icon: L.divIcon({
               className: 'zone-label', 
-              // 標籤內容：紅色的區段號碼 + 小小的總筆數
-              html: `<span style="color:#e74c3c; font-weight:900; font-size:15px;">${row.prefix}</span><br><span style="font-size:10px; color:#555;">(${row.total_points})</span>`, 
-              iconSize: [60, 40],
-              iconAnchor: [30, 20] // 讓標籤中心對準座標
-            }),
-            interactive: false // 讓標籤純顯示，不會擋住下方的地圖點擊
+              html: `<span style="color:#e74c3c; font-weight:900; font-size:16px;">${row.prefix}</span><br><span style="font-size:11px; color:#555;">(${row.total_points} 筆)</span>`, 
+              iconSize: [60, 45],
+              iconAnchor: [30, 22] // 設定錨點，讓標籤完美置中
+            })
           });
           
-          godModeLayer.addLayer(lbl);
+          godModeCluster.addLayer(lbl); // 注意：這裡是加到 Cluster 裡，不是直接加到 map
           bounds.push([row.center_lat, row.center_lng]);
         });
 
-        // 4. 將標籤一次性灑在地圖上
-        map.addLayer(godModeLayer);
+        // 5. 將整個叢集加到地圖上
+        map.addLayer(godModeCluster);
 
         btn.innerHTML = "✅ 全區標籤已載入";
         btn.style.background = "#2c3e50";
         
-        // 5. 視角縮放
+        // 6. 視角自動縮放，漂亮地包住所有的標籤
         if(bounds.length > 0) {
           map.fitBounds(bounds, { padding: [50, 50] });
         }
 
       } catch (err) {
-        console.error("載入標籤失敗:", err);
-        alert("載入失敗！");
+        console.error("載入全區標籤失敗:", err);
+        alert("載入失敗，請檢查網路連線。");
         btn.innerHTML = originalText;
         btn.style.background = "#1DB446";
       }
