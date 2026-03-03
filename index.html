@@ -104,8 +104,49 @@
 
   <script>
     // Supabase 設定
-    const SUPABASE_URL = "https://bvvmdbteacslgjkpdkuh.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2dm1kYnRlYWNzbGdqa3Bka3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzY4NTAsImV4cCI6MjA4ODA1Mjg1MH0.fshL0p1hoBmH1E8ohP_Tpfs51Bh7G4pJL5BjgHiicI8";
+    // ==========================================
+    // ★ 雙主機自動備援設定 (Active-Standby Auto Failover) ★
+    // ==========================================
+    const DB_CONFIGS = [
+      {
+        name: "新主機 (主力)",
+        url: "https://bvvmdbteacslgjkpdkuh.supabase.co",
+        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2dm1kYnRlYWNzbGdqa3Bka3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzY4NTAsImV4cCI6MjA4ODA1Mjg1MH0.fshL0p1hoBmH1E8ohP_Tpfs51Bh7G4pJL5BjgHiicI8"
+      },
+      {
+        name: "舊主機 (備援)",
+        url: "https://fkkejsmvgsthydbmprgf.supabase.co", 
+        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZra2Vqc212Z3N0aHlkYm1wcmdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyNTYzMzEsImV4cCI6MjA4NzgzMjMzMX0.cD_JZ5NJNlNGrJ4-4Y9QtoeZxPH1WAuoD7yZsC-Eg-A" // ⚠️ 記得貼上舊主機的鑰匙！
+      }
+    ];
+
+    // ★ 核心切換引擎：負責幫網頁去敲門，A門不開就秒切B門
+    async function fetchWithFailover(apiPath, method = 'GET') {
+      let lastError;
+      for (let i = 0; i < DB_CONFIGS.length; i++) {
+        let db = DB_CONFIGS[i];
+        try {
+          let response = await fetch(db.url + apiPath, {
+            method: method,
+            headers: { 
+              "apikey": db.key, 
+              "Authorization": "Bearer " + db.key,
+              "Content-Type": "application/json"
+            }
+          });
+          if (response.ok) {
+            return await response.json(); // 成功！馬上把資料送回去
+          } else {
+            console.warn(`⚠️ [${db.name}] 狀態異常 (${response.status})，自動切換下一台...`);
+            lastError = new Error("伺服器狀態異常: " + response.status);
+          }
+        } catch (err) {
+          console.warn(`💥 [${db.name}] 連線失敗，自動切換下一台...`);
+          lastError = err;
+        }
+      }
+      throw new Error("❌ 所有主機皆無法連線，請稍後再試。"); // 兩台都掛了才會走到這
+    }
     const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
     let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
 
@@ -187,18 +228,8 @@
       container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在掃描資料 (約需 5~10 秒)...</div>';
 
       try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_unique_prefixes`, {
-          method: 'POST',
-          headers: { 
-            "apikey": SUPABASE_KEY, 
-            "Authorization": "Bearer " + SUPABASE_KEY,
-            "Content-Type": "application/json"
-          }
-        });
-        
-        if (!response.ok) throw new Error("API 請求被拒絕"); 
-
-        const data = await response.json();
+// 呼叫智慧切換引擎去拿清單
+        const data = await fetchWithFailover("/rest/v1/rpc/get_unique_prefixes", "POST");
         const prefixes = data.map(item => item.prefix).filter(Boolean);
 
         // 3. 寫入快取並渲染
@@ -289,16 +320,10 @@
             // 動態顯示正在下載哪一個區段，讓使用者看見進度
             document.getElementById('loading-text').innerHTML = `🌐 下載區段 [${prefix}] 中...<br>(目前累計 ${allData.length} 筆)`;
             
-            // 每次只專心抓一個區段，並強制用資料庫的 id 排序，保證分頁絕對不會迷航或漏接！
-            const apiUrl = `${SUPABASE_URL}/rest/v1/power_data?power_no=like.${prefix}*&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}&order=power_no.asc`;
+// 呼叫智慧切換引擎去拿座標 (注意這裡只給網址後半段的 Path)
+            const apiPath = `/rest/v1/power_data?power_no=like.${prefix}*&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}&order=power_no.asc`;
             
-            const response = await fetch(apiUrl, {
-              headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-            });
-            
-            if (!response.ok) throw new Error(`讀取 ${prefix} 失敗`);
-
-            const json = await response.json();
+            const json = await fetchWithFailover(apiPath, "GET");
             allData = allData.concat(json);
             
             // 判斷這個單一區段是不是已經抓完了
