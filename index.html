@@ -457,12 +457,7 @@ div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</di
         map.removeLayer(godModeCluster);
       }
 
-      // 2. 建立一個「防重疊叢集」
-      godModeCluster = L.markerClusterGroup({
-        maxClusterRadius: 60,         // 距離 60 pixel 內的標籤會自動合併
-        disableClusteringAtZoom: 14,  // 當地圖放大到 14 級時，強制全部分開不合併
-        spiderfyOnMaxZoom: true       // 太擠的時候會像蜘蛛網一樣彈開
-      });
+
 
       try {
         // 3. 向 Supabase 的實體化視圖要資料 (瞬間回傳)
