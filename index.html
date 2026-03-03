@@ -427,11 +427,54 @@
       document.getElementById('loading').style.display = 'none';
     }
 
+// ==========================================
+    // ★ 升級版：尋找「密度最高」的集中區域 (Density Peak)
+    // ==========================================
     function getCenter(p) { 
-      if(p.length===0) return null; 
-      let la=0, lo=0; 
-      for(let i=0; i<p.length; i++){ la+=p[i][0]; lo+=p[i][1]; } 
-      return [la/p.length, lo/p.length]; 
+      if(p.length === 0) return null; 
+      if(p.length < 5) return [p[0][0], p[0][1]]; // 資料太少直接回傳第一個點
+
+      // 1. 找出該區域的經緯度極限邊界
+      let minLat = p[0][0], maxLat = p[0][0], minLng = p[0][1], maxLng = p[0][1];
+      for(let i=1; i<p.length; i++) {
+        if(p[i][0] < minLat) minLat = p[i][0];
+        if(p[i][0] > maxLat) maxLat = p[i][0];
+        if(p[i][1] < minLng) minLng = p[i][1];
+        if(p[i][1] > maxLng) maxLng = p[i][1];
+      }
+
+      // 2. 將該區域切成 20x20 的網格 (共 400 格雷達)
+      const GRID = 20;
+      let gridCounts = new Array(GRID).fill(0).map(() => new Array(GRID).fill(0));
+      let latStep = (maxLat - minLat) / GRID;
+      let lngStep = (maxLng - minLng) / GRID;
+
+      if (latStep === 0 || lngStep === 0) return [minLat, minLng];
+
+      let maxCount = 0;
+      let denseR = 0, denseC = 0;
+
+      // 3. 掃描所有電號，統計哪個網格擠了最多人
+      for(let i=0; i<p.length; i++) {
+        let r = Math.floor((p[i][0] - minLat) / latStep);
+        let c = Math.floor((p[i][1] - minLng) / lngStep);
+        
+        // 邊界防呆機制
+        if(r >= GRID) r = GRID - 1; if(r < 0) r = 0;
+        if(c >= GRID) c = GRID - 1; if(c < 0) c = 0;
+        
+        gridCounts[r][c]++;
+        
+        // 記錄人口最密集的那個網格 (冠軍網格)
+        if(gridCounts[r][c] > maxCount) {
+          maxCount = gridCounts[r][c];
+          denseR = r;
+          denseC = c;
+        }
+      }
+
+      // 4. 回傳冠軍網格的「正中心」座標，把標籤精準釘下去！
+      return [minLat + (denseR + 0.5) * latStep, minLng + (denseC + 0.5) * lngStep];
     }
 
     window.onload = function() { initMap(); initLiff(); };
