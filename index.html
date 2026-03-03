@@ -104,8 +104,8 @@
 
   <script>
     // Supabase 設定
-    const SUPABASE_URL = "https://fkkejsmvgsthydbmprgf.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZra2Vqc212Z3N0aHlkYm1wcmdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyNTYzMzEsImV4cCI6MjA4NzgzMjMzMX0.cD_JZ5NJNlNGrJ4-4Y9QtoeZxPH1WAuoD7yZsC-Eg-A";
+    const SUPABASE_URL = "https://bvvmdbteacslgjkpdkuh.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2dm1kYnRlYWNzbGdqa3Bka3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzY4NTAsImV4cCI6MjA4ODA1Mjg1MH0.fshL0p1hoBmH1E8ohP_Tpfs51Bh7G4pJL5BjgHiicI8";
     const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
     let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
 
@@ -285,7 +285,7 @@
         let orQuery = selectedPrefixes.map(p => `power_no.like.${p}*`).join(',');
 
         while (hasMore) {
-          document.getElementById('loading-text').innerHTML = `🌐 下載指定圖資中... (已載入 ${allData.length} 筆)`;
+          document.getElementById('loading-text').innerHTML = `🌐 下載指定資料中... (已載入 ${allData.length} 筆)`;
           
           const apiUrl = `${SUPABASE_URL}/rest/v1/power_data?or=(${orQuery})&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}`;
           
