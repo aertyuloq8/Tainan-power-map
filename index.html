@@ -230,9 +230,10 @@ div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</di
       container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在掃描資料 (約需 5~10 秒)...</div>';
 
       try {
-// 呼叫智慧切換引擎去拿清單
-        const data = await fetchWithFailover("/rest/v1/rpc/get_unique_prefixes", "POST");
-        const prefixes = data.map(item => item.prefix).filter(Boolean);
+
+// 直接從你建好的 power_prefix_centers 抓 prefix 欄位，這張表只有幾十筆資料，瞬間秒開！
+const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix&order=prefix.asc", "GET");
+const prefixes = data.map(item => item.prefix).filter(Boolean);
 
         // 3. 寫入快取並渲染
         localStorage.setItem('power_prefixes_cache', JSON.stringify(prefixes));
