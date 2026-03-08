@@ -105,6 +105,7 @@
   <script>
     // ==========================================
     // ★ 雙主機自動備援設定 (Active-Standby Auto Failover) ★
+    // 💡 這裡放 Anon Key 是安全的，因為 RLS 已經升級為需要 authenticated
     // ==========================================
     const DB_CONFIGS = [
       {
@@ -128,17 +129,23 @@
     let colorIndex = 0; 
     let isAllSelected = false;
 
-    // ★ 核心切換引擎 (支援 GET / POST 與資料傳送)
+    // ★ 存放登入成功後核發的「限時通行證」
+    let currentAccessToken = null; 
+
+    // ★ 核心切換引擎 (自動夾帶 Auth 登入憑證)
     async function fetchWithFailover(apiPath, method = 'GET', bodyData = null) {
       let lastError;
       for (let i = 0; i < DB_CONFIGS.length; i++) {
         let db = DB_CONFIGS[i];
         try {
+          // 💡 如果已經登入拿到通行證，就出示通行證；否則出示預設的 Anon Key 來發送登入請求
+          let bearerToken = currentAccessToken ? currentAccessToken : db.key;
+
           let options = {
             method: method,
             headers: { 
               "apikey": db.key, 
-              "Authorization": "Bearer " + db.key,
+              "Authorization": "Bearer " + bearerToken,
               "Content-Type": "application/json"
             }
           };
@@ -148,44 +155,63 @@
           if (response.ok) {
             return await response.json(); 
           } else {
-            console.warn(`⚠️ [${db.name}] 狀態異常 (${response.status})，自動切換下一台...`);
-            lastError = new Error("伺服器狀態異常: " + response.status);
+            console.warn(`⚠️ [${db.name}] 狀態異常 (${response.status})`);
+            lastError = new Error("伺服器狀態異常");
           }
         } catch (err) {
-          console.warn(`💥 [${db.name}] 連線失敗，自動切換下一台...`);
+          console.warn(`💥 [${db.name}] 連線失敗`);
           lastError = err;
         }
       }
-      throw new Error("❌ 所有主機皆無法連線，請稍後再試。"); 
+      throw new Error("❌ 所有主機皆無法連線"); 
     }
 
     // ==========================================
-    // ★ 系統安全鎖 (向後端資料庫驗證密碼)
+    // ★ 系統安全鎖 (無痕版：密碼絕對不寫死在前端)
     // ==========================================
     async function initSecurityCheck() {
       try { 
         await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
         
-        // 如果不是在 LINE 裡面打開的
-        if (!liff.isInClient()) {
-          let pass = prompt("⛔ 偵測到從外部瀏覽器存取。\n請輸入通關密碼以載入台南電力地圖：");
+        let pass = "";
+        
+        // 1. 優先從網址後面抓取密碼包裹 (例如 https://.../?token=密碼)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+
+        if (tokenFromUrl) {
+          pass = tokenFromUrl; // 取得 LINE 機器人暗中送來的密碼
+        } else {
+          // 從一般瀏覽器直接開，或者網址沒帶密碼，強制跳出詢問框
+          pass = prompt("⛔ 存取受保護的資料庫。\n請輸入授權通關密碼：");
           if (!pass) return blockAccess();
-
-          // 把密碼送到 Supabase 進行盲測驗證
-          const isPasswordCorrect = await fetchWithFailover("/rest/v1/rpc/check_map_password", "POST", { secret_code: pass });
-
-          if (isPasswordCorrect !== true) {
-            alert("❌ 密碼錯誤！");
-            return blockAccess(); 
-          }
         }
-        return true; 
+
+        // 2. 向 Supabase 官方驗證中心申請登入 (帳號公開沒差，密碼沒外洩就好)
+        const authData = await fetchWithFailover("/auth/v1/token?grant_type=password", "POST", { 
+          email: "u774719@taipower.com.tw", 
+          password: pass 
+        });
+
+        if (authData && authData.access_token) {
+          currentAccessToken = authData.access_token; // 登入成功，把通行證存入大腦
+          
+          // 登入成功後，立刻把網址上的密碼抹除！(防止長官截圖外流網址)
+          window.history.replaceState(null, null, window.location.pathname);
+          
+          return true; 
+        } else {
+          alert("❌ 密碼錯誤！");
+          return blockAccess();
+        }
       } catch (err) { 
-        console.error("安全驗證失敗", err); 
+        console.error("登入失敗", err); 
+        alert("❌ 密碼錯誤或網路異常！");
         return blockAccess();
       }
     }
 
+    // 拒絕存取的黑屏畫面
     function blockAccess() {
       document.body.innerHTML = `
         <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column;">
@@ -197,11 +223,14 @@
     }
 
     // ==========================================
-    // ★ 系統啟動順序 (唯一入口)
+    // ★ 系統啟動順序 (全網頁唯一入口)
     // ==========================================
     window.onload = async function() { 
+      // 1. 警衛先上前盤查身分並執行登入
       const isAllowed = await initSecurityCheck(); 
-      if (isAllowed) {
+      
+      // 2. 只有取得通行證 (return true)，才准開始畫地圖
+      if (isAllowed === true) {
         initMap(); 
       }
     };
@@ -264,7 +293,7 @@
         return;
       }
 
-      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在撈取資料 (0.1秒)...</div>';
+      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在撈取資料...</div>';
 
       try {
         const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix&order=prefix.asc", "GET");
@@ -369,7 +398,7 @@
 
       layersRef = { heat: {}, markers: {} };
       let groups = { 'OTHER': {p:[], m:[]} }; 
-      let allBounds = []; // ★ 用來收集所有座標以自動縮放
+      let allBounds = [];
 
       for (let i = 0; i < data.length; i++) {
         let lat = Number(data[i][0]), lng = Number(data[i][1]);
@@ -405,7 +434,7 @@
         });
         
         groups[prefix].m.push(circle);
-        allBounds.push([lat, lng]); // ★ 記錄座標
+        allBounds.push([lat, lng]); 
       }
 
       let overlayMaps = {};
@@ -431,7 +460,6 @@
         
         overlayMaps["<span style='color:" + cfg.hex + "'>■</span> " + displayName + " 熱力圖"] = heatGroup;
 
-        // ★ 加上 chunkedLoading: true 效能優化，防止手機卡死
         let cluster = L.markerClusterGroup({ disableClusteringAtZoom: 18, spiderfyOnMaxZoom: false, maxClusterRadius: 80, chunkedLoading: true });
         cluster.addLayers(groups[key].m);
         layersRef.markers[key] = cluster;
@@ -441,7 +469,6 @@
       layerControl = L.control.layers(window.baseMaps, overlayMaps, { collapsed: true }).addTo(map);
       document.getElementById('loading').style.display = 'none';
 
-      // ★ 繪製完成後，自動將鏡頭縮放到剛剛載入的座標範圍！
       if (allBounds.length > 0) {
         map.fitBounds(allBounds, { padding: [30, 30] });
       }
