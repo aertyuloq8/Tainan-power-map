@@ -166,8 +166,8 @@
       throw new Error("❌ 所有主機皆無法連線"); 
     }
 
-    // ==========================================
-    // ★ 系統安全鎖 (無痕版：密碼絕對不寫死在前端)
+// ==========================================
+    // ★ 系統安全鎖 (終極無痕版：密碼絕對不寫在前端)
     // ==========================================
     async function initSecurityCheck() {
       try { 
@@ -175,28 +175,29 @@
         
         let pass = "";
         
-        // 1. 優先從網址後面抓取密碼包裹 (例如 https://.../?token=密碼)
+        // 1. 唯一通道：嘗試從網址抓取秘密包裹 (?token=密碼)
         const urlParams = new URLSearchParams(window.location.search);
         const tokenFromUrl = urlParams.get('token');
 
         if (tokenFromUrl) {
-          pass = tokenFromUrl; // 取得 LINE 機器人暗中送來的密碼
+          // 如果網址有帶包裹 (圖文選單或 GAS 傳來的)，就動態代入密碼 (F12 完全看不到)
+          pass = tokenFromUrl;
         } else {
-          // 從一般瀏覽器直接開，或者網址沒帶密碼，強制跳出詢問框
+          // 如果網址沒有包裹 (自己複製網址去 Chrome 開，或是舊按鈕)，一律強制盤查！
           pass = prompt("⛔ 存取受保護的資料庫。\n請輸入授權通關密碼：");
           if (!pass) return blockAccess();
         }
 
-        // 2. 向 Supabase 官方驗證中心申請登入 (帳號公開沒差，密碼沒外洩就好)
+        // 2. 向 Supabase 官方驗證中心申請登入
         const authData = await fetchWithFailover("/auth/v1/token?grant_type=password", "POST", { 
-          email: "u774719@taipower.com.tw", 
+          email: "viewer@tainan.map", 
           password: pass 
         });
 
         if (authData && authData.access_token) {
-          currentAccessToken = authData.access_token; // 登入成功，把通行證存入大腦
+          currentAccessToken = authData.access_token; 
           
-          // 登入成功後，立刻把網址上的密碼抹除！(防止長官截圖外流網址)
+          // 💡 登入成功後，立刻「抹除」網址上的密碼，防止長官截圖分享時外洩！
           window.history.replaceState(null, null, window.location.pathname);
           
           return true; 
