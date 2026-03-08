@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>電號分佈圖</title>
+  <title>台南電力地圖</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -103,7 +103,6 @@
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <script>
-    // Supabase 設定
     // ==========================================
     // ★ 雙主機自動備援設定 (Active-Standby Auto Failover) ★
     // ==========================================
@@ -116,12 +115,20 @@
       {
         name: "舊主機 (備援)",
         url: "https://tyknsyxarxmswptjpypw.supabase.co", 
-        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5a25zeXhhcnhtc3dwdGpweXB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MDcyMzIsImV4cCI6MjA4ODI4MzIzMn0.4GgiN0VZFdGBLEAXl0qamdIAIatQx29zcwVwnqeQudE" // ⚠️ 記得貼上舊主機的鑰匙！
+        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5a25zeXhhcnhtc3dwdGpweXB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MDcyMzIsImV4cCI6MjA4ODI4MzIzMn0.4GgiN0VZFdGBLEAXl0qamdIAIatQx29zcwVwnqeQudE" 
       }
     ];
 
-    // ★ 核心切換引擎：負責幫網頁去敲門，A門不開就秒切B門
-// ★ 核心切換引擎 (升級版：支援傳送 body 資料)
+    const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
+    let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
+
+    let map;
+    let layersRef = { heat: {}, markers: {} };
+    let layerControl = null;
+    let colorIndex = 0; 
+    let isAllSelected = false;
+
+    // ★ 核心切換引擎 (支援 GET / POST 與資料傳送)
     async function fetchWithFailover(apiPath, method = 'GET', bodyData = null) {
       let lastError;
       for (let i = 0; i < DB_CONFIGS.length; i++) {
@@ -135,7 +142,6 @@
               "Content-Type": "application/json"
             }
           };
-          // 如果有資料要傳送 (例如密碼)，就包進去
           if (bodyData) options.body = JSON.stringify(bodyData);
 
           let response = await fetch(db.url + apiPath, options);
@@ -152,16 +158,8 @@
       }
       throw new Error("❌ 所有主機皆無法連線，請稍後再試。"); 
     }
-    const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
-    let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
 
-    let map;
-    let layersRef = { heat: {}, markers: {} };
-    let layerControl = null;
-    let colorIndex = 0; 
-    let isAllSelected = false;
-
-// ==========================================
+    // ==========================================
     // ★ 系統安全鎖 (向後端資料庫驗證密碼)
     // ==========================================
     async function initSecurityCheck() {
@@ -171,39 +169,41 @@
         // 如果不是在 LINE 裡面打開的
         if (!liff.isInClient()) {
           let pass = prompt("⛔ 偵測到從外部瀏覽器存取。\n請輸入通關密碼以載入台南電力地圖：");
-          if (!pass) return blockAccess(); // 沒輸入直接擋掉
+          if (!pass) return blockAccess();
 
-          // 👉 把密碼送到 Supabase 進行盲測驗證 (網頁上完全沒有密碼的蹤影)
+          // 把密碼送到 Supabase 進行盲測驗證
           const isPasswordCorrect = await fetchWithFailover("/rest/v1/rpc/check_map_password", "POST", { secret_code: pass });
 
           if (isPasswordCorrect !== true) {
-            return blockAccess(); // 伺服器說密碼錯了，擋掉！
+            alert("❌ 密碼錯誤！");
+            return blockAccess(); 
           }
         }
-        return true; // 驗證通過
+        return true; 
       } catch (err) { 
         console.error("安全驗證失敗", err); 
         return blockAccess();
       }
     }
 
-    // 拒絕存取的黑屏畫面
     function blockAccess() {
       document.body.innerHTML = `
         <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column;">
-          <h1 style="color:#e74c3c;">⛔ 密碼錯誤，存取被拒</h1>
+          <h1 style="color:#e74c3c;">⛔ 存取被拒</h1>
           <p>請從官方 LINE 機器人內部開啟，或輸入正確的授權密碼。</p>
         </div>
       `;
       return false;
     }
-    
+
     // ==========================================
-    // ★ 系統啟動順序
+    // ★ 系統啟動順序 (唯一入口)
     // ==========================================
     window.onload = async function() { 
       const isAllowed = await initSecurityCheck(); 
-      if (isAllowed) initMap(); 
+      if (isAllowed) {
+        initMap(); 
+      }
     };
 
     // 地圖初始化
@@ -215,7 +215,6 @@
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       window.baseMaps = { "深色模式": darkLayer, "一般街道": streetLayer };
 
-      // ★ 左上角重整按鈕 (點擊清除圖層記憶並重新選取)
       var ReloadControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function() {
@@ -223,7 +222,7 @@
           div.innerHTML = '🔄';
           div.title = "重新選擇區段";
           div.onclick = function() { 
-            localStorage.removeItem('last_selected_prefixes'); // 清除勾選記憶
+            localStorage.removeItem('last_selected_prefixes'); 
             location.reload(); 
           }; 
           return div;
@@ -231,12 +230,11 @@
       });
       map.addControl(new ReloadControl());
 
-      // 右上角全選控制面板
       var MasterToggleControl = L.Control.extend({
         options: { position: 'topright' },
         onAdd: function() {
           var div = L.DomUtil.create('div', 'master-toggle');
-div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</div>
+          div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</div>
             <label><input type="checkbox" id="toggle-all-heat" checked> 🟥 顯示所有熱力圖</label>
             <label><input type="checkbox" id="toggle-all-markers"> 📍 顯示所有詳細點位</label>
             <hr style="margin: 8px 0; border-top: 1px solid #ddd;">
@@ -254,91 +252,68 @@ div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</di
       });
       map.addControl(new MasterToggleControl());
 
-      // 開始讀取前 4 碼清單
       buildPrefixModal();
     }
 
-    // ==========================================
-    // 智慧型載入區段清單 (結合快取與 RPC)
-    // ==========================================
     async function buildPrefixModal() {
       const container = document.getElementById('prefix-container');
-
-      // 1. 檢查快取
       const cachedPrefixes = localStorage.getItem('power_prefixes_cache');
+      
       if (cachedPrefixes) {
         renderPrefixes(JSON.parse(cachedPrefixes));
         return;
       }
 
-      // 2. 如果沒快取，呼叫 Supabase 進行全表掃描
-      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在掃描資料 (約需 5~10 秒)...</div>';
+      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在撈取資料 (0.1秒)...</div>';
 
       try {
-
-// 直接從你建好的 power_prefix_centers 抓 prefix 欄位，這張表只有幾十筆資料，瞬間秒開！
-const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix&order=prefix.asc", "GET");
-const prefixes = data.map(item => item.prefix).filter(Boolean);
-
-        // 3. 寫入快取並渲染
+        const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix&order=prefix.asc", "GET");
+        const prefixes = data.map(item => item.prefix).filter(Boolean);
         localStorage.setItem('power_prefixes_cache', JSON.stringify(prefixes));
         renderPrefixes(prefixes);
-
       } catch (err) {
         container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: red;">❌ 讀取區段清單失敗，請檢查網路。</div>';
         console.error("讀取清單失敗:", err);
       }
     }
 
-    // ==========================================
-    // 將清單畫成核取方塊，並檢查是否有「上次的記憶」
-    // ==========================================
     function renderPrefixes(prefixes) {
       const container = document.getElementById('prefix-container');
       container.innerHTML = ''; 
       
-      // 🧠 1. 讀取大腦裡「上次勾選了哪些區段」
       let lastSelected = [];
       try {
         const saved = localStorage.getItem('last_selected_prefixes');
         if (saved) lastSelected = JSON.parse(saved);
       } catch (e) {}
 
-      // 2. 產生核取方塊
       prefixes.forEach(prefix => {
         const label = document.createElement('label');
         label.className = 'prefix-label';
-        // 如果這個區段在上次的記憶裡，就幫它加上 checked 自動打勾
         const isChecked = lastSelected.includes(prefix) ? 'checked' : '';
         label.innerHTML = `<input type="checkbox" value="${prefix}" ${isChecked}> ${prefix}`;
         container.appendChild(label);
       });
 
-      // 🚀 3. 如果有記憶，直接幫使用者自動按下「確認載入」！
       if (lastSelected.length > 0) {
         startLoadingData();
       }
     }
 
-    // 手動強制清除快取並重新掃描資料庫
     async function forceRescan() {
-      if(confirm("確定要重新掃描資料庫中的最新區段嗎？\n(這將花費約 5~10 秒鐘)")) {
+      if(confirm("確定要重新掃描資料庫中的最新區段嗎？")) {
         localStorage.removeItem('power_prefixes_cache'); 
         document.getElementById('prefix-container').innerHTML = ''; 
         await buildPrefixModal(); 
       }
     }
 
-    // 全選/清除按鈕
     function toggleAllPrefixes() {
       isAllSelected = !isAllSelected;
       const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]');
       checkboxes.forEach(cb => cb.checked = isAllSelected);
     }
 
-    // ==========================================
-    // 依據勾選區段下載資料 (★ 升級為逐一區段獨立下載版)
-    // ==========================================
     async function startLoadingData() {
       const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]:checked');
       const selectedPrefixes = Array.from(checkboxes).map(cb => cb.value);
@@ -348,9 +323,7 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
         return;
       }
 
-      // 💾 儲存記憶
       localStorage.setItem('last_selected_prefixes', JSON.stringify(selectedPrefixes));
-
       document.getElementById('prefix-modal').style.display = 'none';
       document.getElementById('loading').style.display = 'flex';
 
@@ -358,32 +331,25 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
         let allData = [];
         const limit = 10000;
 
-        // ★ 核心魔法：不再把多個條件塞成一包！我們「一個一個區段」獨立向資料庫要資料
         for (let i = 0; i < selectedPrefixes.length; i++) {
           let prefix = selectedPrefixes[i];
           let offset = 0;
           let hasMore = true;
 
           while (hasMore) {
-            // 動態顯示正在下載哪一個區段，讓使用者看見進度
             document.getElementById('loading-text').innerHTML = `🌐 下載區段 [${prefix}] 中...<br>(目前累計 ${allData.length} 筆)`;
-            
-// 呼叫智慧切換引擎去拿座標 (注意這裡只給網址後半段的 Path)
             const apiPath = `/rest/v1/power_data?power_no=like.${prefix}*&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}&order=power_no.asc`;
-            
             const json = await fetchWithFailover(apiPath, "GET");
             allData = allData.concat(json);
             
-            // 判斷這個單一區段是不是已經抓完了
             if (json.length < limit) {
-              hasMore = false; // 抓完了，迴圈會進入下一個 prefix
+              hasMore = false; 
             } else {
-              offset += limit; // 還沒抓完，繼續抓這個 prefix 的下一頁
+              offset += limit; 
             }
           }
         }
 
-        // 全部的區段都平安抓完後，統一交給地圖去畫
         document.getElementById('loading-text').innerHTML = "🎨 資料下載完成，準備繪製地圖...";
         const mappedData = allData.map(r => [r.lat, r.lng, r.power_no || "", r.civil_eng || ""]);
         processData(mappedData);
@@ -394,9 +360,6 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
       }
     }
 
-    // ==========================================
-    // 繪製地圖與叢集
-    // ==========================================
     function processData(data) {
       document.getElementById('loading-text').innerHTML = "🎨 繪製圖層中...";
 
@@ -406,6 +369,7 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
 
       layersRef = { heat: {}, markers: {} };
       let groups = { 'OTHER': {p:[], m:[]} }; 
+      let allBounds = []; // ★ 用來收集所有座標以自動縮放
 
       for (let i = 0; i < data.length; i++) {
         let lat = Number(data[i][0]), lng = Number(data[i][1]);
@@ -439,7 +403,9 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
             '</div>';
           e.target.bindPopup(popupContent).openPopup();
         });
+        
         groups[prefix].m.push(circle);
+        allBounds.push([lat, lng]); // ★ 記錄座標
       }
 
       let overlayMaps = {};
@@ -465,7 +431,8 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
         
         overlayMaps["<span style='color:" + cfg.hex + "'>■</span> " + displayName + " 熱力圖"] = heatGroup;
 
-        let cluster = L.markerClusterGroup({ disableClusteringAtZoom: 18, spiderfyOnMaxZoom: false, maxClusterRadius: 80 });
+        // ★ 加上 chunkedLoading: true 效能優化，防止手機卡死
+        let cluster = L.markerClusterGroup({ disableClusteringAtZoom: 18, spiderfyOnMaxZoom: false, maxClusterRadius: 80, chunkedLoading: true });
         cluster.addLayers(groups[key].m);
         layersRef.markers[key] = cluster;
         overlayMaps["📍 " + displayName + " 詳細點位"] = cluster;
@@ -473,6 +440,11 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
 
       layerControl = L.control.layers(window.baseMaps, overlayMaps, { collapsed: true }).addTo(map);
       document.getElementById('loading').style.display = 'none';
+
+      // ★ 繪製完成後，自動將鏡頭縮放到剛剛載入的座標範圍！
+      if (allBounds.length > 0) {
+        map.fitBounds(allBounds, { padding: [30, 30] });
+      }
     }
 
     function getCenter(p) { 
@@ -481,85 +453,67 @@ const prefixes = data.map(item => item.prefix).filter(Boolean);
       for(let i=0; i<p.length; i++){ la+=p[i][0]; lo+=p[i][1]; } 
       return [la/p.length, lo/p.length]; 
     }
-    
-    window.onload = function() { initMap(); initLiff(); };
 
-// ==========================================
-// ★ 上帝視角：讀取實體化視圖 + 可顯示/隱藏標籤
-// ==========================================
+    // ==========================================
+    // ★ 上帝視角：讀取實體化視圖 + 可顯示/隱藏標籤
+    // ==========================================
+    let godModeLayer = null;   
+    let godModeVisible = false; 
 
-let godModeLayer = null;   // 存放標籤圖層
-let godModeVisible = false; // 紀錄目前是否顯示
+    async function loadGodModeLabels() {
+      const btn = document.querySelector('button[onclick="loadGodModeLabels()"]');
+      let originalText = btn.innerHTML;
 
-async function loadGodModeLabels() {
+      if (godModeVisible) {
+        map.removeLayer(godModeLayer);
+        godModeVisible = false;
+        btn.innerHTML = "🌍全區標籤";
+        btn.style.background = "#1DB446";
+        return;
+      }
 
-  const btn = document.querySelector('button[onclick="loadGodModeLabels()"]');
-  let originalText = btn.innerHTML;
+      btn.innerHTML = "⏳ 雲端計算中...";
+      btn.style.background = "#f39c12";
 
-  // 如果已經顯示 → 直接隱藏
-  if (godModeVisible) {
-    map.removeLayer(godModeLayer);
-    godModeVisible = false;
-    btn.innerHTML = "🔎 顯示全區標籤";
-    btn.style.background = "#1DB446";
-    return;
-  }
+      try {
+        godModeLayer = L.layerGroup();
+        const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=*", "GET");
+        let bounds = [];
 
-  btn.innerHTML = "⏳ 雲端計算中...";
-  btn.style.background = "#f39c12";
+        data.forEach(row => {
+          let marker = L.marker([row.center_lat, row.center_lng], {
+            icon: L.divIcon({
+              className: 'zone-label',
+              html: `
+                <span style="color:#e74c3c;font-weight:900;font-size:16px;">${row.prefix}</span><br>
+                <span style="font-size:11px;color:#555;">(${row.total_points} 筆)</span>
+              `,
+              iconSize: [70, 50],
+              iconAnchor: [35, 25]
+            })
+          });
 
-  try {
+          godModeLayer.addLayer(marker);
+          bounds.push([row.center_lat, row.center_lng]);
+        });
 
-    // 建立圖層群組（不叢集）
-    godModeLayer = L.layerGroup();
+        godModeLayer.addTo(map);
+        godModeVisible = true;
 
-    const data = await fetchWithFailover(
-      "/rest/v1/power_prefix_centers?select=*",
-      "GET"
-    );
+        btn.innerHTML = "🙈 隱藏全區標籤";
+        btn.style.background = "#2c3e50";
 
-    let bounds = [];
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
 
-    data.forEach(row => {
-
-      let marker = L.marker([row.center_lat, row.center_lng], {
-        icon: L.divIcon({
-          className: 'zone-label',
-          html: `
-            <span style="color:#e74c3c;font-weight:900;font-size:16px;">
-              ${row.prefix}
-            </span><br>
-            <span style="font-size:11px;color:#555;">
-              (${row.total_points} 筆)
-            </span>
-          `,
-          iconSize: [70, 50],
-          iconAnchor: [35, 25]
-        })
-      });
-
-      godModeLayer.addLayer(marker);
-      bounds.push([row.center_lat, row.center_lng]);
-    });
-
-    // 加到地圖
-    godModeLayer.addTo(map);
-    godModeVisible = true;
-
-    btn.innerHTML = "🙈 隱藏全區標籤";
-    btn.style.background = "#2c3e50";
-
-    if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [50, 50] });
+      } catch (err) {
+        console.error("載入失敗:", err);
+        alert("載入失敗，請檢查網路。");
+        btn.innerHTML = originalText;
+        btn.style.background = "#1DB446";
+      }
     }
-
-  } catch (err) {
-    console.error("載入失敗:", err);
-    alert("載入失敗，請檢查網路。");
-    btn.innerHTML = originalText;
-    btn.style.background = "#1DB446";
-  }
-}
   </script>
 </body>
 </html>
