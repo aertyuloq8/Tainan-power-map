@@ -121,21 +121,26 @@
     ];
 
     // ★ 核心切換引擎：負責幫網頁去敲門，A門不開就秒切B門
-    async function fetchWithFailover(apiPath, method = 'GET') {
+// ★ 核心切換引擎 (升級版：支援傳送 body 資料)
+    async function fetchWithFailover(apiPath, method = 'GET', bodyData = null) {
       let lastError;
       for (let i = 0; i < DB_CONFIGS.length; i++) {
         let db = DB_CONFIGS[i];
         try {
-          let response = await fetch(db.url + apiPath, {
+          let options = {
             method: method,
             headers: { 
               "apikey": db.key, 
               "Authorization": "Bearer " + db.key,
               "Content-Type": "application/json"
             }
-          });
+          };
+          // 如果有資料要傳送 (例如密碼)，就包進去
+          if (bodyData) options.body = JSON.stringify(bodyData);
+
+          let response = await fetch(db.url + apiPath, options);
           if (response.ok) {
-            return await response.json(); // 成功！馬上把資料送回去
+            return await response.json(); 
           } else {
             console.warn(`⚠️ [${db.name}] 狀態異常 (${response.status})，自動切換下一台...`);
             lastError = new Error("伺服器狀態異常: " + response.status);
@@ -145,7 +150,7 @@
           lastError = err;
         }
       }
-      throw new Error("❌ 所有主機皆無法連線，請稍後再試。"); // 兩台都掛了才會走到這
+      throw new Error("❌ 所有主機皆無法連線，請稍後再試。"); 
     }
     const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
     let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
@@ -156,27 +161,50 @@
     let colorIndex = 0; 
     let isAllSelected = false;
 
-// LIFF 初始化與環境安全鎖
-async function initLiff() {
-  try { 
-    await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
-    
-    // 🔒 安全鎖：檢查使用者是不是在 LINE APP 裡面打開的
-    if (!liff.isInClient()) {
-      // 如果是用一般瀏覽器 (Chrome, Safari) 打開，就直接把畫面清空並阻擋
+// ==========================================
+    // ★ 系統安全鎖 (向後端資料庫驗證密碼)
+    // ==========================================
+    async function initSecurityCheck() {
+      try { 
+        await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
+        
+        // 如果不是在 LINE 裡面打開的
+        if (!liff.isInClient()) {
+          let pass = prompt("⛔ 偵測到從外部瀏覽器存取。\n請輸入通關密碼以載入台南電力地圖：");
+          if (!pass) return blockAccess(); // 沒輸入直接擋掉
+
+          // 👉 把密碼送到 Supabase 進行盲測驗證 (網頁上完全沒有密碼的蹤影)
+          const isPasswordCorrect = await fetchWithFailover("/rest/v1/rpc/check_map_password", "POST", { secret_code: pass });
+
+          if (isPasswordCorrect !== true) {
+            return blockAccess(); // 伺服器說密碼錯了，擋掉！
+          }
+        }
+        return true; // 驗證通過
+      } catch (err) { 
+        console.error("安全驗證失敗", err); 
+        return blockAccess();
+      }
+    }
+
+    // 拒絕存取的黑屏畫面
+    function blockAccess() {
       document.body.innerHTML = `
         <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column;">
-          <h1 style="color:#e74c3c;">⛔ 存取被拒</h1>
-          <p>基於資安考量，請從官方 LINE 機器人內部開啟此系統。</p>
+          <h1 style="color:#e74c3c;">⛔ 密碼錯誤，存取被拒</h1>
+          <p>請從官方 LINE 機器人內部開啟，或輸入正確的授權密碼。</p>
         </div>
       `;
-      return; // 終止後續執行
+      return false;
     }
     
-  } catch (err) { 
-    console.error("LIFF 初始化失敗", err); 
-  }
-}
+    // ==========================================
+    // ★ 系統啟動順序
+    // ==========================================
+    window.onload = async function() { 
+      const isAllowed = await initSecurityCheck(); 
+      if (isAllowed) initMap(); 
+    };
 
     // 地圖初始化
     function initMap() {
