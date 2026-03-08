@@ -156,10 +156,27 @@
     let colorIndex = 0; 
     let isAllSelected = false;
 
-    // LIFF 初始化
-    async function initLiff() {
-      try { await liff.init({ liffId: "2009264862-z2kqi1C3" }); } catch (err) { console.error("LIFF 初始化失敗", err); }
+// LIFF 初始化與環境安全鎖
+async function initLiff() {
+  try { 
+    await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
+    
+    // 🔒 安全鎖：檢查使用者是不是在 LINE APP 裡面打開的
+    if (!liff.isInClient()) {
+      // 如果是用一般瀏覽器 (Chrome, Safari) 打開，就直接把畫面清空並阻擋
+      document.body.innerHTML = `
+        <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column;">
+          <h1 style="color:#e74c3c;">⛔ 存取被拒</h1>
+          <p>基於資安考量，請從官方 LINE 機器人內部開啟此系統。</p>
+        </div>
+      `;
+      return; // 終止後續執行
     }
+    
+  } catch (err) { 
+    console.error("LIFF 初始化失敗", err); 
+  }
+}
 
     // 地圖初始化
     function initMap() {
