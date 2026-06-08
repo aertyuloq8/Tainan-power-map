@@ -58,6 +58,12 @@
       cursor: pointer; border: 1px solid #ddd; font-weight: bold; color: #333;
     }
     .prefix-label input { margin-right: 5px; width: 18px; height: 18px; }
+    .prefix-label.selected { background: #e8f8ee; border-color: #1DB446; color: #0b7d2b; }
+    .prefix-label small { display: block; font-size: 11px; color: #777; font-weight: normal; margin-top: 2px; }
+    .prefix-label span { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+    .modal-tools { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .prefix-search { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; padding: 10px; font-size: 15px; }
+    .selection-summary { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; font-size: 13px; color: #333; white-space: nowrap; font-weight: bold; }
     .modal-footer { display: flex; justify-content: space-between; gap: 10px; }
     .btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
     .btn-all { background: #e0e0e0; color: #333; }
@@ -81,8 +87,11 @@
     <div class="modal-content">
       <div class="modal-header">
         <span>⚡ 選擇要載入的區段</span>
-        <span>⛔ 不要全選會出錯</span>
         <button class="btn-rescan" onclick="forceRescan()">🔄 重新掃描</button>
+      </div>
+      <div class="modal-tools">
+        <input class="prefix-search" id="prefix-search" type="search" placeholder="搜尋區段，例如 1001" oninput="filterPrefixes()">
+        <div class="selection-summary" id="selection-summary">已選 0 區 / 0 筆</div>
       </div>
       <div class="prefix-grid" id="prefix-container">
         </div>
@@ -128,6 +137,7 @@
     let layerControl = null;
     let colorIndex = 0; 
     let isAllSelected = false;
+    let prefixRows = [];
 
     // ★ 存放登入成功後核發的「限時通行證」
     let currentAccessToken = null; 
@@ -295,24 +305,38 @@
       const cachedPrefixes = localStorage.getItem('power_prefixes_cache');
       
       if (cachedPrefixes) {
-        renderPrefixes(JSON.parse(cachedPrefixes));
-        return;
+        try {
+          const cached = JSON.parse(cachedPrefixes);
+          if (Array.isArray(cached) || !cached.rows) {
+            localStorage.removeItem('power_prefixes_cache');
+            return buildPrefixModal();
+          }
+          prefixRows = cached.rows;
+          renderPrefixes(prefixRows);
+        } catch (e) {
+          localStorage.removeItem('power_prefixes_cache');
+          return buildPrefixModal();
+        }
+        if (prefixRows.length > 0) return;
+        return buildPrefixModal();
       }
 
       container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在撈取資料...</div>';
 
       try {
-        const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix&order=prefix.asc", "GET");
-        const prefixes = data.map(item => item.prefix).filter(Boolean);
-        localStorage.setItem('power_prefixes_cache', JSON.stringify(prefixes));
-        renderPrefixes(prefixes);
+        const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix,total_points&order=prefix.asc", "GET");
+        prefixRows = data
+          .filter(item => item.prefix)
+          .map(item => ({ prefix: item.prefix, total_points: Number(item.total_points || 0) }));
+        localStorage.setItem('power_prefixes_cache', JSON.stringify({ savedAt: Date.now(), rows: prefixRows }));
+        renderPrefixes(prefixRows);
       } catch (err) {
         container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: red;">❌ 讀取區段清單失敗，請檢查網路。</div>';
         console.error("讀取清單失敗:", err);
       }
     }
 
-    function renderPrefixes(prefixes) {
+    function renderPrefixes(rows) {
       const container = document.getElementById('prefix-container');
       container.innerHTML = ''; 
       
@@ -322,17 +346,53 @@
         if (saved) lastSelected = JSON.parse(saved);
       } catch (e) {}
 
-      prefixes.forEach(prefix => {
+      rows.forEach(row => {
+        const prefix = row.prefix;
         const label = document.createElement('label');
         label.className = 'prefix-label';
+        label.dataset.prefix = prefix;
+        label.dataset.points = row.total_points || 0;
         const isChecked = lastSelected.includes(prefix) ? 'checked' : '';
-        label.innerHTML = `<input type="checkbox" value="${prefix}" ${isChecked}> ${prefix}`;
+        if (isChecked) label.classList.add('selected');
+        label.innerHTML = `<input type="checkbox" value="${prefix}" ${isChecked} onchange="updateSelectionSummary()"> <span>${prefix}<small>${formatCompactNumber(row.total_points || 0)} 筆</small></span>`;
         container.appendChild(label);
       });
+      updateSelectionSummary();
 
       if (lastSelected.length > 0) {
         startLoadingData();
       }
+    }
+
+    function formatCompactNumber(n) {
+      n = Number(n || 0);
+      if (n >= 10000) return (n / 10000).toFixed(1).replace(".0", "") + "萬";
+      return n.toLocaleString("zh-TW");
+    }
+
+    function filterPrefixes() {
+      const keyword = document.getElementById('prefix-search').value.trim();
+      document.querySelectorAll('.prefix-label').forEach(label => {
+        label.style.display = !keyword || label.dataset.prefix.indexOf(keyword) > -1 ? "flex" : "none";
+      });
+    }
+
+    function updateSelectionSummary() {
+      let selectedCount = 0;
+      let selectedPoints = 0;
+      document.querySelectorAll('#prefix-container input[type="checkbox"]').forEach(cb => {
+        const label = cb.closest('.prefix-label');
+        const points = Number(label.dataset.points || 0);
+        if (cb.checked) {
+          selectedCount++;
+          selectedPoints += points;
+          label.classList.add('selected');
+        } else {
+          label.classList.remove('selected');
+        }
+      });
+      document.getElementById('selection-summary').textContent = `已選 ${selectedCount} 區 / 約 ${formatCompactNumber(selectedPoints)} 筆`;
+      return { selectedCount, selectedPoints };
     }
 
     async function forceRescan() {
@@ -345,8 +405,9 @@
 
     function toggleAllPrefixes() {
       isAllSelected = !isAllSelected;
-      const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]');
+      const checkboxes = document.querySelectorAll('#prefix-container .prefix-label:not([style*="display: none"]) input[type="checkbox"]');
       checkboxes.forEach(cb => cb.checked = isAllSelected);
+      updateSelectionSummary();
     }
 
     async function startLoadingData() {
@@ -356,6 +417,12 @@
       if (selectedPrefixes.length === 0) {
         alert("請至少選擇一個區段！");
         return;
+      }
+
+      const summary = updateSelectionSummary();
+      if (summary.selectedPoints > 30000 || selectedPrefixes.length > 8) {
+        const ok = confirm(`本次約會下載 ${formatCompactNumber(summary.selectedPoints)} 筆資料，可能需要較久時間並消耗資料庫 IO。\n\n確定要繼續載入嗎？`);
+        if (!ok) return;
       }
 
       localStorage.setItem('last_selected_prefixes', JSON.stringify(selectedPrefixes));
