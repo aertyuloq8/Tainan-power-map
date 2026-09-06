@@ -264,7 +264,12 @@
 
     // 地圖初始化
     function initMap() {
-      const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CARTO', maxZoom: 20 });
+     // 替換原本的 CARTO 網址：
+const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri',
+  maxNativeZoom: 16, // 原廠圖資最高到 16
+  maxZoom: 20        // 允許使用者繼續放大到 20 級細看電號
+});
       const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' });
 
       map = L.map('map', { center: [23.05, 120.2], zoom: 12, layers: [darkLayer], preferCanvas: true, zoomControl: false });
