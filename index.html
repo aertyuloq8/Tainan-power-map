@@ -19,15 +19,14 @@
       --primary: #10b981;
       --primary-dark: #059669;
       --primary-light: #e8f8ee;
-      --danger: #ef4444;
-      --dark: #1e293b;
-      --surface: rgba(255, 255, 255, 0.94);
+      --dark: #0f172a;
+      --surface: rgba(255, 255, 255, 0.95);
       --border: #e2e8f0;
-      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     }
 
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif; background: #f8fafc; overflow: hidden; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif; background: #0f172a; overflow: hidden; }
     #map { width: 100vw; height: 100vh; background: #e5e7eb; }
     
     /* 載入畫面 */
@@ -38,69 +37,68 @@
     }
     .spinner {
       border: 5px solid rgba(255, 255, 255, 0.2); border-top: 5px solid var(--primary);
-      border-radius: 50%; width: 52px; height: 52px;
+      border-radius: 50%; width: 50px; height: 50px;
       animation: spin 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite; margin-bottom: 16px;
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    #loading-text { font-size: 16px; font-weight: bold; text-align: center; line-height: 1.6; letter-spacing: 0.5px; }
+    #loading-text { font-size: 16px; font-weight: bold; text-align: center; line-height: 1.6; }
 
-    /* 頂部底圖快速切換膠囊 (Segmented Control) */
+    /* 頂部底圖切換膠囊 */
     .basemap-pill {
-      position: absolute; top: 16px; left: 60px; z-index: 1000;
+      position: absolute; top: 14px; left: 62px; z-index: 1000;
       background: var(--surface); backdrop-filter: blur(10px);
       padding: 4px; border-radius: 30px; box-shadow: var(--shadow);
       display: flex; gap: 4px; border: 1px solid rgba(255, 255, 255, 0.8);
     }
     .pill-btn {
-      border: none; background: transparent; padding: 7px 16px;
-      border-radius: 20px; font-size: 13.5px; font-weight: 700;
+      border: none; background: transparent; padding: 7px 14px;
+      border-radius: 20px; font-size: 13px; font-weight: 700;
       color: #64748b; cursor: pointer; transition: all 0.2s ease;
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 5px;
     }
     .pill-btn.active {
       background: var(--primary); color: white;
       box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
     }
 
-    /* 右上角多功能浮動面板 */
+    /* 右上角：整合式可收合圖層面板 */
     .gis-toolbox {
       background: var(--surface); backdrop-filter: blur(12px);
-      padding: 14px 16px; border-radius: 16px; box-shadow: var(--shadow);
-      border: 1px solid rgba(255, 255, 255, 0.8); min-width: 200px;
+      border-radius: 16px; box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      overflow: hidden; min-width: 190px; transition: all 0.25s ease;
     }
-    .toolbox-title {
-      font-size: 13px; font-weight: 800; color: #475569;
-      letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+    .toolbox-header {
+      padding: 10px 14px; font-size: 13.5px; font-weight: 800; color: #334155;
       display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; user-select: none; background: rgba(241, 245, 249, 0.7);
     }
+    .toolbox-header:hover { background: #f1f5f9; }
+    .toolbox-arrow { font-size: 11px; transition: transform 0.25s ease; }
+    .toolbox-body { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .gis-toolbox.collapsed .toolbox-body { display: none; }
+    .gis-toolbox.collapsed .toolbox-arrow { transform: rotate(-90deg); }
+
     .toolbox-item {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 0; font-size: 14px; font-weight: 600; color: var(--dark);
-      cursor: pointer;
+      padding: 6px 0; font-size: 13.5px; font-weight: 700; color: #1e293b;
+      cursor: pointer; user-select: none;
     }
     .toolbox-item input[type="checkbox"] {
-      width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer;
+      width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; margin: 0;
     }
-    .toolbox-btn {
-      width: 100%; padding: 8px 12px; border: none; border-radius: 8px;
-      font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-    }
-    .btn-god { background: #f1f5f9; color: #334155; margin-top: 8px; }
-    .btn-god:hover { background: #e2e8f0; }
-    .btn-god.active { background: var(--dark); color: white; }
 
-    /* 浮動重新選區按鈕 (左上角) */
+    /* 左上角重整按鈕 */
     .leaflet-control-custom-btn {
       background: var(--surface) !important; backdrop-filter: blur(10px);
       width: 40px !important; height: 40px !important; line-height: 40px !important;
       border-radius: 12px !important; cursor: pointer; text-align: center;
       box-shadow: var(--shadow) !important; border: 1px solid rgba(255, 255, 255, 0.8) !important;
-      font-size: 18px; transition: transform 0.2s;
+      font-size: 19px; transition: transform 0.15s ease; user-select: none;
     }
-    .leaflet-control-custom-btn:hover { transform: scale(1.05); }
+    .leaflet-control-custom-btn:hover { transform: scale(1.06); }
 
-    /* 彈窗選單 (Prefix Modal) */
+    /* 區段彈窗 */
     #prefix-modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); z-index: 10000;
@@ -112,7 +110,7 @@
       max-height: 85vh; display: flex; flex-direction: column;
     }
     .modal-header { 
-      font-size: 18px; font-weight: 800; margin-bottom: 14px; color: var(--dark);
+      font-size: 17px; font-weight: 800; margin-bottom: 12px; color: var(--dark);
       display: flex; justify-content: space-between; align-items: center;
     }
     .modal-tools { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-bottom: 12px; }
@@ -127,10 +125,10 @@
     }
     .prefix-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-      overflow-y: auto; padding: 6px 2px; margin-bottom: 16px;
+      overflow-y: auto; padding: 4px 2px; margin-bottom: 16px;
     }
     .prefix-label {
-      background: #f8fafc; padding: 10px 6px; border-radius: 10px;
+      background: #f8fafc; padding: 10px 6px; border-radius: 12px;
       display: flex; align-items: center; justify-content: center; font-size: 14px;
       cursor: pointer; border: 1.5px solid var(--border); font-weight: 700; color: #334155;
       transition: all 0.15s ease; user-select: none;
@@ -138,20 +136,19 @@
     .prefix-label input { display: none; }
     .prefix-label.selected {
       background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark);
-      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
     }
     .prefix-label span { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
     .prefix-label small { font-size: 11px; color: #64748b; font-weight: 500; margin-top: 3px; }
     .prefix-label.selected small { color: #047857; }
     
     .modal-footer { display: flex; gap: 10px; }
-    .btn { flex: 1; padding: 13px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 15px; transition: opacity 0.2s; }
-    .btn:active { opacity: 0.85; }
+    .btn { flex: 1; padding: 13px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 15px; }
     .btn-all { background: #f1f5f9; color: #475569; }
     .btn-submit { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
     .btn-rescan { background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: #475569; font-weight: 700; }
 
-    /* 地圖標籤與彈窗 */
+    /* 地圖標籤樣式 */
     .zone-label {
       background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px);
       border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 8px;
@@ -168,9 +165,9 @@
     }
 
     @media (max-width: 600px) {
-      .basemap-pill { left: 56px; top: 12px; }
-      .pill-btn { padding: 6px 12px; font-size: 12px; }
-      .gis-toolbox { padding: 10px 12px; min-width: 170px; }
+      .basemap-pill { left: 54px; top: 12px; }
+      .pill-btn { padding: 6px 11px; font-size: 12px; }
+      .gis-toolbox { min-width: 165px; }
     }
   </style>
 </head>
@@ -195,7 +192,7 @@
       </div>
       <div class="modal-tools">
         <input class="prefix-search" id="prefix-search" type="search" placeholder="搜尋區段代碼，如 1001" oninput="filterPrefixes()">
-        <div class="selection-summary" id="selection-summary">已選 0 區 / 0 筆</div>
+        <div class="selection-summary" id="selection-summary">已選 0 區 / 約 0 筆</div>
       </div>
       <div class="prefix-grid" id="prefix-container"></div>
       <div class="modal-footer">
@@ -217,7 +214,7 @@
 
   <script>
     // ==========================================
-    // ★ 雙主機自動備援設定 (Active-Standby Auto Failover) ★
+    // ★ 雙主機自動備援設定
     // ==========================================
     const DB_CONFIGS = [
       {
@@ -234,7 +231,6 @@
 
     const EDGE_AUTH_URL = "https://gdpcyoogacdkwuozmbbw.supabase.co/functions/v1/hyper-responder";
 
-    // 調色盤
     const COLOR_PALETTE = ['#e11d48', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#db2777', '#ca8a04', '#4f46e5', '#059669'];
     let CONFIG = { 'OTHER': { color: 'gray', hex: '#64748b', gradient: {0.4: '#64748b', 1: '#0f172a'} } };
 
@@ -245,8 +241,8 @@
     let isAllSelected = false;
     let prefixRows = [];
     let currentAccessToken = null; 
+    let godModeLayer = null;   
 
-    // ★ 核心切換引擎
     async function fetchWithFailover(apiPath, method = 'GET', bodyData = null) {
       let lastError;
       for (let i = 0; i < DB_CONFIGS.length; i++) {
@@ -277,14 +273,10 @@
     }
 
     // ==========================================
-    // ★ 系統安全鎖 (LINE / Telegram 雙軌驗證)
-    // ==========================================
-// ==========================================
-    // ★ 系統安全鎖 (修復第二度開啟卡死問題)
+    // ★ 系統安全鎖
     // ==========================================
     async function initSecurityCheck() {
       try { 
-        // 1. 初始化 SDK (加上防呆)
         if (window.liff && typeof liff.init === 'function') {
           try { await liff.init({ liffId: "2009264862-z2kqi1C3" }); } catch(e) {}
         }
@@ -292,7 +284,6 @@
           window.Telegram.WebApp.ready();
         }
 
-        // 2. 如果短期記憶已有通行證，直接放行並確保遮罩關閉
         const cachedToken = sessionStorage.getItem('session_access_token');
         if (cachedToken) {
           currentAccessToken = cachedToken;
@@ -304,7 +295,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const otpFromUrl = urlParams.get('otp') || urlParams.get('token');
 
-        // 3. 智慧多軌判斷
         if (otpFromUrl) {
           window.history.replaceState(null, null, window.location.pathname);
           requestPayload = { otp: otpFromUrl.trim() };
@@ -322,7 +312,6 @@
           requestPayload = { otp: inputOtp.trim() };
         }
 
-        // 4. 呼叫後端 Edge Function (加入 8 秒超時保護，防止網路塞車無限卡住)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
 
@@ -339,8 +328,6 @@
         if (response.ok && result.access_token) {
           currentAccessToken = result.access_token;
           sessionStorage.setItem('session_access_token', currentAccessToken);
-          
-          // ★★★ 關鍵修正：核驗通過後，立刻關閉核驗載入黑屏，露出區段選擇視窗 ★★★
           document.getElementById('loading').style.display = 'none';
           return true; 
         } else {
@@ -352,7 +339,6 @@
       } catch (err) { 
         sessionStorage.removeItem('session_access_token');
         document.getElementById('loading').style.display = 'none';
-        console.error("登入異常:", err);
         alert("❌ 身分核驗連線異常：" + (err.name === 'AbortError' ? '連線逾時' : err.message));
         return blockAccess("系統連線異常");
       }
@@ -381,17 +367,15 @@
     };
 
     // ==========================================
-    // 地圖初始化 (NLSC 國土測繪圖資服務雲)
+    // 地圖初始化
     // ==========================================
     function initMap() {
-      // 1. 臺灣通用電子地圖 (EMAP)
       const emapLayer = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', {
         attribution: '&copy; <a href="https://maps.nlsc.gov.tw/" target="_blank">國土測繪圖資服務雲</a>',
         maxNativeZoom: 20,
         maxZoom: 20
       });
 
-      // 2. 正射影像(航照圖) (PHOTO2)
       const photoLayer = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', {
         attribution: '&copy; <a href="https://maps.nlsc.gov.tw/" target="_blank">國土測繪圖資服務雲</a>',
         maxNativeZoom: 19,
@@ -410,12 +394,12 @@
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // 左上角浮動按鈕：重新選擇區段
+      // 左上角浮動按鈕：重新選擇區段 (改回原始重整圖示 🔄)
       const ReloadControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function() {
           const div = L.DomUtil.create('div', 'leaflet-control-custom-btn');
-          div.innerHTML = '⚡';
+          div.innerHTML = '🔄';
           div.title = "重新選擇區段";
           div.onclick = function() { 
             localStorage.removeItem('last_selected_prefixes'); 
@@ -426,41 +410,107 @@
       });
       map.addControl(new ReloadControl());
 
-      // 右上角浮動面板：圖層開關箱
+      // 右上角：整合式圖層控制箱 (可收合/展開)
       const ToolBoxControl = L.Control.extend({
         options: { position: 'topright' },
         onAdd: function() {
           const div = L.DomUtil.create('div', 'gis-toolbox');
+          div.id = 'gis-toolbox-panel';
           div.innerHTML = `
-            <div class="toolbox-title">圖層顯示控制</div>
-            <label class="toolbox-item">
-              <span>🔥 熱力圖層</span>
-              <input type="checkbox" id="toggle-all-heat" checked>
-            </label>
-            <label class="toolbox-item">
-              <span>📍 詳細點位</span>
-              <input type="checkbox" id="toggle-all-markers">
-            </label>
-            <button class="toolbox-btn btn-god" onclick="loadGodModeLabels()">🏷️ 全區標籤</button>
+            <div class="toolbox-header" onclick="toggleToolbox()">
+              <span>🗂️ 圖層與標籤</span>
+              <span class="toolbox-arrow">▼</span>
+            </div>
+            <div class="toolbox-body">
+              <label class="toolbox-item">
+                <span>🔥 熱力圖層</span>
+                <input type="checkbox" id="toggle-all-heat" checked onchange="toggleAllHeat(this.checked)">
+              </label>
+              <label class="toolbox-item">
+                <span>📍 詳細點位</span>
+                <input type="checkbox" id="toggle-all-markers" onchange="toggleAllMarkers(this.checked)">
+              </label>
+              <label class="toolbox-item">
+                <span>🏷️ 全區中心標籤</span>
+                <input type="checkbox" id="toggle-all-labels" onchange="toggleGodModeLabels(this.checked)">
+              </label>
+            </div>
           `;
           L.DomEvent.disableClickPropagation(div);
-
-          div.querySelector('#toggle-all-heat').addEventListener('change', function(e) {
-            for (let key in layersRef.heat) {
-              e.target.checked ? map.addLayer(layersRef.heat[key]) : map.removeLayer(layersRef.heat[key]);
-            }
-          });
-          div.querySelector('#toggle-all-markers').addEventListener('change', function(e) {
-            for (let key in layersRef.markers) {
-              e.target.checked ? map.addLayer(layersRef.markers[key]) : map.removeLayer(layersRef.markers[key]);
-            }
-          });
           return div;
         }
       });
       map.addControl(new ToolBoxControl());
 
       buildPrefixModal();
+    }
+
+    // 收合 / 展開圖層箱
+    function toggleToolbox() {
+      const box = document.getElementById('gis-toolbox-panel');
+      if (box) box.classList.toggle('collapsed');
+    }
+
+    // 圖層連動控制
+    function toggleAllHeat(checked) {
+      for (let key in layersRef.heat) {
+        checked ? map.addLayer(layersRef.heat[key]) : map.removeLayer(layersRef.heat[key]);
+      }
+    }
+
+    function toggleAllMarkers(checked) {
+      for (let key in layersRef.markers) {
+        checked ? map.addLayer(layersRef.markers[key]) : map.removeLayer(layersRef.markers[key]);
+      }
+    }
+
+    async function toggleGodModeLabels(checked) {
+      if (!checked) {
+        if (godModeLayer) map.removeLayer(godModeLayer);
+        return;
+      }
+
+      if (godModeLayer) {
+        map.addLayer(godModeLayer);
+        return;
+      }
+
+      document.getElementById('loading').style.display = 'flex';
+      document.getElementById('loading-text').innerHTML = "🏷️ 載入全區標籤中...";
+
+      try {
+        godModeLayer = L.layerGroup();
+        const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=*", "GET");
+        let bounds = [];
+
+        data.forEach(row => {
+          let marker = L.marker([row.center_lat, row.center_lng], {
+            icon: L.divIcon({
+              className: 'zone-label',
+              html: `
+                <span style="color:#10b981;font-weight:900;font-size:15px;">${row.prefix}</span><br>
+                <span style="font-size:11px;color:#cbd5e1;">(${row.total_points} 筆)</span>
+              `,
+              iconSize: [68, 44],
+              iconAnchor: [34, 22]
+            })
+          });
+
+          godModeLayer.addLayer(marker);
+          bounds.push([row.center_lat, row.center_lng]);
+        });
+
+        godModeLayer.addTo(map);
+        document.getElementById('loading').style.display = 'none';
+
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        alert("載入標籤失敗，請檢查網路。");
+        document.getElementById('toggle-all-labels').checked = false;
+      }
     }
 
     // 底圖切換器
@@ -478,7 +528,7 @@
     }
 
     // ==========================================
-    // 區段彈窗建置
+    // 區段彈窗渲染（修復點擊選取問題）
     // ==========================================
     async function buildPrefixModal() {
       const container = document.getElementById('prefix-container');
@@ -507,7 +557,7 @@
         localStorage.setItem('power_prefixes_cache', JSON.stringify({ savedAt: Date.now(), rows: prefixRows }));
         renderPrefixes(prefixRows);
       } catch (err) {
-        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #ef4444; padding: 20px;">❌ 讀取清單失敗，請確認網路或登入狀態。</div>';
+        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #ef4444; padding: 20px;">❌ 讀取清單失敗，請檢查連線。</div>';
       }
     }
 
@@ -523,25 +573,19 @@
 
       rows.forEach(row => {
         const prefix = row.prefix;
+        const isChecked = lastSelected.includes(prefix);
+
         const label = document.createElement('label');
-        label.className = 'prefix-label';
+        label.className = 'prefix-label' + (isChecked ? ' selected' : '');
         label.dataset.prefix = prefix;
         label.dataset.points = row.total_points || 0;
-        const isChecked = lastSelected.includes(prefix) ? 'checked' : '';
-        if (isChecked) label.classList.add('selected');
 
+        // ★ 核心修復：使用標準 onchange 連動樣式，徹底避免點擊衝突
         label.innerHTML = `
-          <input type="checkbox" value="${prefix}" ${isChecked}>
+          <input type="checkbox" value="${prefix}" ${isChecked ? 'checked' : ''} onchange="handlePrefixChange(this)">
           <span>${prefix}<small>${formatCompactNumber(row.total_points || 0)} 筆</small></span>
         `;
         
-        label.addEventListener('click', function(e) {
-          const cb = this.querySelector('input');
-          if (e.target !== cb) cb.checked = !cb.checked;
-          this.classList.toggle('selected', cb.checked);
-          updateSelectionSummary();
-        });
-
         container.appendChild(label);
       });
       updateSelectionSummary();
@@ -549,6 +593,16 @@
       if (lastSelected.length > 0) {
         startLoadingData();
       }
+    }
+
+    function handlePrefixChange(checkbox) {
+      const parentLabel = checkbox.closest('.prefix-label');
+      if (checkbox.checked) {
+        parentLabel.classList.add('selected');
+      } else {
+        parentLabel.classList.remove('selected');
+      }
+      updateSelectionSummary();
     }
 
     function formatCompactNumber(n) {
@@ -573,9 +627,6 @@
         if (cb.checked) {
           selectedCount++;
           selectedPoints += points;
-          label.classList.add('selected');
-        } else {
-          label.classList.remove('selected');
         }
       });
       document.getElementById('selection-summary').textContent = `已選 ${selectedCount} 區 / 約 ${formatCompactNumber(selectedPoints)} 筆`;
@@ -583,7 +634,7 @@
     }
 
     async function forceRescan() {
-      if(confirm("確定要重新掃描最新區段中心與統計嗎？")) {
+      if(confirm("確定要重新掃描最新區段統計嗎？")) {
         localStorage.removeItem('power_prefixes_cache'); 
         document.getElementById('prefix-container').innerHTML = ''; 
         await buildPrefixModal(); 
@@ -601,7 +652,7 @@
     }
 
     // ==========================================
-    // 資料分頁批次載入
+    // 資料批次加載
     // ==========================================
     async function startLoadingData() {
       const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]:checked');
@@ -645,7 +696,7 @@
           }
         }
 
-        document.getElementById('loading-text').innerHTML = "🎨 圖資下載完畢，正在渲染地圖點位...";
+        document.getElementById('loading-text').innerHTML = "🎨 圖資下載完成，正在渲染點位...";
         const mappedData = allData.map(r => [r.lat, r.lng, r.power_no || "", r.civil_eng || ""]);
         processData(mappedData);
 
@@ -682,7 +733,6 @@
         }
         groups[prefix].p.push([lat, lng]);
         
-        // 點位樣式
         let circle = L.circleMarker([lat, lng], { 
           radius: 6, 
           fillColor: CONFIG[prefix].hex, 
@@ -753,61 +803,6 @@
       let la = 0, lo = 0; 
       for(let i = 0; i < p.length; i++) { la += p[i][0]; lo += p[i][1]; } 
       return [la / p.length, lo / p.length]; 
-    }
-
-    // ==========================================
-    // 上帝視角：全區中心標籤
-    // ==========================================
-    let godModeLayer = null;   
-    let godModeVisible = false; 
-
-    async function loadGodModeLabels() {
-      const btn = document.querySelector('.btn-god');
-
-      if (godModeVisible) {
-        map.removeLayer(godModeLayer);
-        godModeVisible = false;
-        btn.classList.remove('active');
-        btn.innerHTML = "🏷️ 全區標籤";
-        return;
-      }
-
-      btn.innerHTML = "⏳ 載入中...";
-
-      try {
-        godModeLayer = L.layerGroup();
-        const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=*", "GET");
-        let bounds = [];
-
-        data.forEach(row => {
-          let marker = L.marker([row.center_lat, row.center_lng], {
-            icon: L.divIcon({
-              className: 'zone-label',
-              html: `
-                <span style="color:#10b981;font-weight:900;font-size:15px;">${row.prefix}</span><br>
-                <span style="font-size:11px;color:#cbd5e1;">(${row.total_points} 筆)</span>
-              `,
-              iconSize: [68, 44],
-              iconAnchor: [34, 22]
-            })
-          });
-
-          godModeLayer.addLayer(marker);
-          bounds.push([row.center_lat, row.center_lng]);
-        });
-
-        godModeLayer.addTo(map);
-        godModeVisible = true;
-        btn.classList.add('active');
-        btn.innerHTML = "🙈 隱藏標籤";
-
-        if (bounds.length > 0) {
-          map.fitBounds(bounds, { padding: [50, 50] });
-        }
-      } catch (err) {
-        alert("載入標籤失敗，請檢查網路狀態。");
-        btn.innerHTML = "🏷️ 全區標籤";
-      }
     }
   </script>
 </body>
