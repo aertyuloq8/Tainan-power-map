@@ -109,6 +109,7 @@
   <div id="map"></div>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <script>
     // ==========================================
@@ -179,10 +180,14 @@
 // ==========================================
     // ★ 系統安全鎖 (手機 LINE 自動免密登入 + 電腦 OTP 驗證)
     // ==========================================
+// ==========================================
+    // ★ 系統安全鎖 (支援 LINE / Telegram 雙平台自動免密通關)
+    // ==========================================
     async function initSecurityCheck() {
       try { 
-        // 1. 初始化 LINE LIFF SDK
-        await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
+        // 1. 初始化 SDK
+        if (window.liff) await liff.init({ liffId: "2009264862-z2kqi1C3" });
+        if (window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.ready();
 
         // 2. 如果瀏覽器記憶體已有通行證（重新整理時），直接放行
         const cachedToken = sessionStorage.getItem('session_access_token');
@@ -192,16 +197,30 @@
         }
 
         let requestPayload = {};
+        const urlParams = new URLSearchParams(window.location.search);
+        const otpFromUrl = urlParams.get('otp') || urlParams.get('token');
 
-        // 3. 判斷環境：是否在手機 LINE App 內部開啟？
-        if (liff.isInClient()) {
-          // 👉 手機 LINE 內部開啟：啟用免輸入自動通關模式
+        // 3. 智慧多軌判斷
+        if (otpFromUrl) {
+          // 👉 情況 A：網址有帶驗證碼 (Telegram 產生的連結)，自動取用並抹除網址歷程
+          window.history.replaceState(null, null, window.location.pathname);
+          requestPayload = { otp: otpFromUrl.trim() };
+
+        } else if (window.liff && liff.isInClient()) {
+          // 👉 情況 B：手機 LINE 內部開啟，自動免密通關
           document.getElementById('loading').style.display = 'flex';
           document.getElementById('loading-text').innerHTML = "⚡ LINE 身分安全核驗中...";
           requestPayload = { is_line_client: true };
+
+        } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+          // 👉 情況 C：Telegram 內部開啟，自動免密通關
+          document.getElementById('loading').style.display = 'flex';
+          document.getElementById('loading-text').innerHTML = "⚡ Telegram 身分安全核驗中...";
+          requestPayload = { is_line_client: true };
+
         } else {
-          // 👉 電腦瀏覽器開啟：跳出 6 位數輸入視窗
-          let inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 派發的 6 位數電腦登入碼：\n（請至 LINE 聊天室傳送「電腦登入」獲取）");
+          // 👉 情況 D：一般外部電腦瀏覽器，才跳出輸入框
+          let inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 或 Telegram 派發的 6 位數電腦登入碼：\n（可至聊天室傳送「電腦登入」獲取）");
           if (!inputOtp) return blockAccess("未輸入驗證碼");
           requestPayload = { otp: inputOtp.trim() };
         }
@@ -219,13 +238,11 @@
         const result = await response.json();
 
         if (response.ok && result.access_token) {
-          // 驗證通過，儲存通行證
           currentAccessToken = result.access_token;
           sessionStorage.setItem('session_access_token', currentAccessToken);
           return true; 
         } else {
           sessionStorage.removeItem('session_access_token');
-          // 顯示後端回傳的確切錯誤原因
           alert("❌ 驗證未通過：\n" + (result.error || "未知錯誤，請重新整理"));
           return blockAccess(result.error);
         }
