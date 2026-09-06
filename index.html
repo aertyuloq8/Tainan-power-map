@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>電號分布圖</title>
+  <title>電號空間分布圖系統</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -15,88 +15,192 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 
   <style>
-    body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; }
-    #map { width: 100vw; height: 100vh; background: #222; }
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --primary-light: #e8f8ee;
+      --danger: #ef4444;
+      --dark: #1e293b;
+      --surface: rgba(255, 255, 255, 0.94);
+      --border: #e2e8f0;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif; background: #f8fafc; overflow: hidden; }
+    #map { width: 100vw; height: 100vh; background: #e5e7eb; }
     
     /* 載入畫面 */
     #loading {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.9); z-index: 9998;
-      display: none; flex-direction: column;
-      justify-content: center; align-items: center; color: white;
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 99999;
+      display: none; flex-direction: column; justify-content: center; align-items: center; color: white;
     }
     .spinner {
-      border: 6px solid #444; border-top: 6px solid #00e676;
-      border-radius: 50%; width: 50px; height: 50px;
-      animation: spin 1s linear infinite; margin-bottom: 15px;
+      border: 5px solid rgba(255, 255, 255, 0.2); border-top: 5px solid var(--primary);
+      border-radius: 50%; width: 52px; height: 52px;
+      animation: spin 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite; margin-bottom: 16px;
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #loading-text { font-size: 16px; font-weight: bold; text-align: center; line-height: 1.6; letter-spacing: 0.5px; }
 
-    /* 彈出選單樣式 */
+    /* 頂部底圖快速切換膠囊 (Segmented Control) */
+    .basemap-pill {
+      position: absolute; top: 16px; left: 60px; z-index: 1000;
+      background: var(--surface); backdrop-filter: blur(10px);
+      padding: 4px; border-radius: 30px; box-shadow: var(--shadow);
+      display: flex; gap: 4px; border: 1px solid rgba(255, 255, 255, 0.8);
+    }
+    .pill-btn {
+      border: none; background: transparent; padding: 7px 16px;
+      border-radius: 20px; font-size: 13.5px; font-weight: 700;
+      color: #64748b; cursor: pointer; transition: all 0.2s ease;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pill-btn.active {
+      background: var(--primary); color: white;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    /* 右上角多功能浮動面板 */
+    .gis-toolbox {
+      background: var(--surface); backdrop-filter: blur(12px);
+      padding: 14px 16px; border-radius: 16px; box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.8); min-width: 200px;
+    }
+    .toolbox-title {
+      font-size: 13px; font-weight: 800; color: #475569;
+      letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .toolbox-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0; font-size: 14px; font-weight: 600; color: var(--dark);
+      cursor: pointer;
+    }
+    .toolbox-item input[type="checkbox"] {
+      width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer;
+    }
+    .toolbox-btn {
+      width: 100%; padding: 8px 12px; border: none; border-radius: 8px;
+      font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-god { background: #f1f5f9; color: #334155; margin-top: 8px; }
+    .btn-god:hover { background: #e2e8f0; }
+    .btn-god.active { background: var(--dark); color: white; }
+
+    /* 浮動重新選區按鈕 (左上角) */
+    .leaflet-control-custom-btn {
+      background: var(--surface) !important; backdrop-filter: blur(10px);
+      width: 40px !important; height: 40px !important; line-height: 40px !important;
+      border-radius: 12px !important; cursor: pointer; text-align: center;
+      box-shadow: var(--shadow) !important; border: 1px solid rgba(255, 255, 255, 0.8) !important;
+      font-size: 18px; transition: transform 0.2s;
+    }
+    .leaflet-control-custom-btn:hover { transform: scale(1.05); }
+
+    /* 彈窗選單 (Prefix Modal) */
     #prefix-modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.85); z-index: 10000;
+      background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); z-index: 10000;
       display: flex; justify-content: center; align-items: center;
     }
     .modal-content {
-      background: #fff; width: 90%; max-width: 400px;
-      border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      max-height: 80vh; display: flex; flex-direction: column;
+      background: #ffffff; width: 92%; max-width: 440px;
+      border-radius: 20px; padding: 22px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      max-height: 85vh; display: flex; flex-direction: column;
     }
     .modal-header { 
-      font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1DB446; 
-      border-bottom: 2px solid #eee; padding-bottom: 10px;
+      font-size: 18px; font-weight: 800; margin-bottom: 14px; color: var(--dark);
       display: flex; justify-content: space-between; align-items: center;
     }
+    .modal-tools { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-bottom: 12px; }
+    .prefix-search {
+      width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 10px 14px; font-size: 14px; outline: none; transition: border-color 0.2s;
+    }
+    .prefix-search:focus { border-color: var(--primary); }
+    .selection-summary {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; font-size: 13px; color: #475569; font-weight: 700; white-space: nowrap;
+    }
     .prefix-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-      overflow-y: auto; padding: 10px 0; margin-bottom: 15px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      overflow-y: auto; padding: 6px 2px; margin-bottom: 16px;
     }
     .prefix-label {
-      background: #f0f2f5; padding: 8px 5px; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center; font-size: 15px;
-      cursor: pointer; border: 1px solid #ddd; font-weight: bold; color: #333;
+      background: #f8fafc; padding: 10px 6px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      cursor: pointer; border: 1.5px solid var(--border); font-weight: 700; color: #334155;
+      transition: all 0.15s ease; user-select: none;
     }
-    .prefix-label input { margin-right: 5px; width: 18px; height: 18px; }
-    .prefix-label.selected { background: #e8f8ee; border-color: #1DB446; color: #0b7d2b; }
-    .prefix-label small { display: block; font-size: 11px; color: #777; font-weight: normal; margin-top: 2px; }
-    .prefix-label span { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
-    .modal-tools { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .prefix-search { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; padding: 10px; font-size: 15px; }
-    .selection-summary { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; font-size: 13px; color: #333; white-space: nowrap; font-weight: bold; }
-    .modal-footer { display: flex; justify-content: space-between; gap: 10px; }
-    .btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
-    .btn-all { background: #e0e0e0; color: #333; }
-    .btn-submit { background: #1DB446; color: white; }
-    .btn-rescan { background: #f0f2f5; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: #555; font-weight: bold; }
+    .prefix-label input { display: none; }
+    .prefix-label.selected {
+      background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark);
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+    }
+    .prefix-label span { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+    .prefix-label small { font-size: 11px; color: #64748b; font-weight: 500; margin-top: 3px; }
+    .prefix-label.selected small { color: #047857; }
+    
+    .modal-footer { display: flex; gap: 10px; }
+    .btn { flex: 1; padding: 13px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 15px; transition: opacity 0.2s; }
+    .btn:active { opacity: 0.85; }
+    .btn-all { background: #f1f5f9; color: #475569; }
+    .btn-submit { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+    .btn-rescan { background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: #475569; font-weight: 700; }
 
-    /* 地圖元件樣式 */
-    .zone-label { background: rgba(255, 255, 255, 0.9); border: 2px solid #333; border-radius: 4px; color: #000; font-weight: bold; font-size: 14px; padding: 2px 6px; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); white-space: nowrap; }
-    .info-box { font-size: 14px; line-height: 1.6; min-width: 180px; }
-    .info-btn { display: block; margin-top: 10px; text-decoration: none; color: white !important; background: #1DB446; padding: 8px; text-align: center; border-radius: 4px; font-weight: bold; }
-    .leaflet-control-reload { background: white; width: 34px; height: 34px; border-radius: 4px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 18px; border: 2px solid rgba(0,0,0,0.2); }
-    .master-toggle { background: rgba(255, 255, 255, 0.95); padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 14px; color: #333; border: 2px solid rgba(0,0,0,0.2); }
-    .master-toggle label { cursor: pointer; display: flex; align-items: center; margin-top: 8px; font-weight: bold; }
-    .master-toggle input { margin-right: 8px; width: 16px; height: 16px; cursor: pointer; }
-    .master-toggle-title { font-weight: 900; color: #1DB446; border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-bottom: 5px; text-align: center; }
+    /* 地圖標籤與彈窗 */
+    .zone-label {
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 8px;
+      color: #fff; font-weight: 800; font-size: 13px; padding: 4px 8px;
+      text-align: center; box-shadow: var(--shadow); white-space: nowrap;
+    }
+    .leaflet-popup-content-wrapper { border-radius: 16px; padding: 4px; box-shadow: var(--shadow); }
+    .info-box { font-size: 14px; line-height: 1.7; min-width: 200px; padding: 8px 6px; }
+    .info-header { font-size: 16px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; margin-bottom: 6px; }
+    .info-btn {
+      display: block; margin-top: 10px; text-decoration: none; color: white !important;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 9px;
+      text-align: center; border-radius: 10px; font-weight: 700; box-shadow: 0 3px 8px rgba(16, 185, 129, 0.35);
+    }
+
+    @media (max-width: 600px) {
+      .basemap-pill { left: 56px; top: 12px; }
+      .pill-btn { padding: 6px 12px; font-size: 12px; }
+      .gis-toolbox { padding: 10px 12px; min-width: 170px; }
+    }
   </style>
 </head>
 <body>
 
+  <!-- 底圖切換膠囊 -->
+  <div class="basemap-pill">
+    <button class="pill-btn active" id="btn-emap" onclick="switchBaseMap('EMAP')">
+      🗺️ 臺灣電子地圖
+    </button>
+    <button class="pill-btn" id="btn-photo" onclick="switchBaseMap('PHOTO')">
+      🛰️ 正射航照圖
+    </button>
+  </div>
+
+  <!-- 區段選擇彈窗 -->
   <div id="prefix-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <span>⚡ 選擇要載入的區段</span>
+        <span>⚡ 選擇載入電號區段</span>
         <button class="btn-rescan" onclick="forceRescan()">🔄 重新掃描</button>
       </div>
       <div class="modal-tools">
-        <input class="prefix-search" id="prefix-search" type="search" placeholder="搜尋區段，例如 1001" oninput="filterPrefixes()">
+        <input class="prefix-search" id="prefix-search" type="search" placeholder="搜尋區段代碼，如 1001" oninput="filterPrefixes()">
         <div class="selection-summary" id="selection-summary">已選 0 區 / 0 筆</div>
       </div>
       <div class="prefix-grid" id="prefix-container"></div>
       <div class="modal-footer">
         <button class="btn btn-all" onclick="toggleAllPrefixes()">全選 / 清除</button>
-        <button class="btn btn-submit" onclick="startLoadingData()">🚀 確認載入</button>
+        <button class="btn btn-submit" onclick="startLoadingData()">🚀 載入資料</button>
       </div>
     </div>
   </div>
@@ -128,30 +232,27 @@
       }
     ];
 
-    // ★ 後端動態驗證碼 (OTP) 認證閘道端點（不含任何明碼帳號資訊）
     const EDGE_AUTH_URL = "https://gdpcyoogacdkwuozmbbw.supabase.co/functions/v1/hyper-responder";
 
-    const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
-    let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
+    // 調色盤
+    const COLOR_PALETTE = ['#e11d48', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#db2777', '#ca8a04', '#4f46e5', '#059669'];
+    let CONFIG = { 'OTHER': { color: 'gray', hex: '#64748b', gradient: {0.4: '#64748b', 1: '#0f172a'} } };
 
     let map;
+    let baseLayers = {};
     let layersRef = { heat: {}, markers: {} };
-    let layerControl = null;
     let colorIndex = 0; 
     let isAllSelected = false;
     let prefixRows = [];
-
-    // 存放後端核發的限時通行證
     let currentAccessToken = null; 
 
-    // ★ 核心切換引擎 (自動夾帶 Auth 憑證)
+    // ★ 核心切換引擎
     async function fetchWithFailover(apiPath, method = 'GET', bodyData = null) {
       let lastError;
       for (let i = 0; i < DB_CONFIGS.length; i++) {
         let db = DB_CONFIGS[i];
         try {
           let bearerToken = currentAccessToken ? currentAccessToken : db.key;
-
           let options = {
             method: method,
             headers: { 
@@ -166,30 +267,23 @@
           if (response.ok) {
             return await response.json(); 
           } else {
-            console.warn(`⚠️ [${db.name}] 狀態異常 (${response.status})`);
-            lastError = new Error("伺服器狀態異常");
+            lastError = new Error(`[${db.name}] 狀態異常: ${response.status}`);
           }
         } catch (err) {
-          console.warn(`💥 [${db.name}] 連線失敗`);
           lastError = err;
         }
       }
-      throw new Error("❌ 所有主機皆無法連線"); 
+      throw new Error("❌ 主機連線異常"); 
     }
 
-// ==========================================
-    // ★ 系統安全鎖 (手機 LINE 自動免密登入 + 電腦 OTP 驗證)
     // ==========================================
-// ==========================================
-    // ★ 系統安全鎖 (支援 LINE / Telegram 雙平台自動免密通關)
+    // ★ 系統安全鎖 (LINE / Telegram 雙軌驗證)
     // ==========================================
     async function initSecurityCheck() {
       try { 
-        // 1. 初始化 SDK
         if (window.liff) await liff.init({ liffId: "2009264862-z2kqi1C3" });
         if (window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.ready();
 
-        // 2. 如果瀏覽器記憶體已有通行證（重新整理時），直接放行
         const cachedToken = sessionStorage.getItem('session_access_token');
         if (cachedToken) {
           currentAccessToken = cachedToken;
@@ -200,68 +294,54 @@
         const urlParams = new URLSearchParams(window.location.search);
         const otpFromUrl = urlParams.get('otp') || urlParams.get('token');
 
-        // 3. 智慧多軌判斷
         if (otpFromUrl) {
-          // 👉 情況 A：網址有帶驗證碼 (Telegram 產生的連結)，自動取用並抹除網址歷程
           window.history.replaceState(null, null, window.location.pathname);
           requestPayload = { otp: otpFromUrl.trim() };
-
         } else if (window.liff && liff.isInClient()) {
-          // 👉 情況 B：手機 LINE 內部開啟，自動免密通關
           document.getElementById('loading').style.display = 'flex';
           document.getElementById('loading-text').innerHTML = "⚡ LINE 身分安全核驗中...";
           requestPayload = { is_line_client: true };
-
         } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-          // 👉 情況 C：Telegram 內部開啟，自動免密通關
           document.getElementById('loading').style.display = 'flex';
           document.getElementById('loading-text').innerHTML = "⚡ Telegram 身分安全核驗中...";
           requestPayload = { is_line_client: true };
-
         } else {
-          // 👉 情況 D：一般外部電腦瀏覽器，才跳出輸入框
-          let inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 或 Telegram 派發的 6 位數電腦登入碼：\n（可至聊天室傳送「電腦登入」獲取）");
+          let inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 或 Telegram 派發的 6 位數電腦登入碼：\n（請至聊天室傳送「電腦登入」獲取）");
           if (!inputOtp) return blockAccess("未輸入驗證碼");
           requestPayload = { otp: inputOtp.trim() };
         }
 
-        // 4. 呼叫後端 Edge Function
         const response = await fetch(EDGE_AUTH_URL, {
           method: "POST",
-          headers: {
-            "apikey": DB_CONFIGS[0].key,
-            "Content-Type": "application/json"
-          },
+          headers: { "apikey": DB_CONFIGS[0].key, "Content-Type": "application/json" },
           body: JSON.stringify(requestPayload)
         });
 
         const result = await response.json();
-
         if (response.ok && result.access_token) {
           currentAccessToken = result.access_token;
           sessionStorage.setItem('session_access_token', currentAccessToken);
           return true; 
         } else {
           sessionStorage.removeItem('session_access_token');
-          alert("❌ 驗證未通過：\n" + (result.error || "未知錯誤，請重新整理"));
+          alert("❌ 驗證未通過：\n" + (result.error || "未知錯誤"));
           return blockAccess(result.error);
         }
       } catch (err) { 
         sessionStorage.removeItem('session_access_token');
-        console.error("登入異常:", err); 
-        alert("❌ 系統連線異常：" + err.message);
+        alert("❌ 連線異常：" + err.message);
         return blockAccess("系統連線異常");
       }
     }
 
     function blockAccess(reason) {
       document.body.innerHTML = `
-        <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px; box-sizing:border-box;">
-          <h1 style="color:#e74c3c; margin-bottom:10px;">⛔ 存取被拒</h1>
-          <p style="color:#aaa; font-size:15px; max-width:400px; line-height:1.6;">
-            ${reason || "請從官方 LINE 開啟，或輸入正確的 6 位數電腦登入碼。"}
+        <div style="display:flex; height:100vh; width:100vw; background:#0f172a; color:white; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px;">
+          <h1 style="color:#ef4444; margin-bottom:8px;">⛔ 存取被拒</h1>
+          <p style="color:#94a3b8; font-size:15px; max-width:380px; line-height:1.6;">
+            ${reason || "請從官方 LINE / Telegram 開啟，或輸入正確的 6 位數電腦登入碼。"}
           </p>
-          <button onclick="location.reload()" style="margin-top:20px; padding:10px 24px; background:#1DB446; color:white; border:none; border-radius:6px; font-weight:bold; font-size:15px; cursor:pointer;">
+          <button onclick="location.reload()" style="margin-top:20px; padding:12px 28px; background:#10b981; color:white; border:none; border-radius:10px; font-weight:bold; font-size:15px; cursor:pointer;">
             🔄 重新整理
           </button>
         </div>
@@ -269,9 +349,6 @@
       return false;
     }
 
-    // ==========================================
-    // ★ 系統啟動順序
-    // ==========================================
     window.onload = async function() { 
       const isAllowed = await initSecurityCheck(); 
       if (isAllowed === true) {
@@ -279,25 +356,42 @@
       }
     };
 
-    // 地圖初始化
+    // ==========================================
+    // 地圖初始化 (NLSC 國土測繪圖資服務雲)
+    // ==========================================
     function initMap() {
-     // 替換原本的 CARTO 網址：
-const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Esri',
-  maxNativeZoom: 16, // 原廠圖資最高到 16
-  maxZoom: 20        // 允許使用者繼續放大到 20 級細看電號
-});
-      const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' });
+      // 1. 臺灣通用電子地圖 (EMAP)
+      const emapLayer = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', {
+        attribution: '&copy; <a href="https://maps.nlsc.gov.tw/" target="_blank">國土測繪圖資服務雲</a>',
+        maxNativeZoom: 20,
+        maxZoom: 20
+      });
 
-      map = L.map('map', { center: [23.05, 120.2], zoom: 12, layers: [darkLayer], preferCanvas: true, zoomControl: false });
+      // 2. 正射影像(航照圖) (PHOTO2)
+      const photoLayer = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', {
+        attribution: '&copy; <a href="https://maps.nlsc.gov.tw/" target="_blank">國土測繪圖資服務雲</a>',
+        maxNativeZoom: 19,
+        maxZoom: 20
+      });
+
+      baseLayers = { "EMAP": emapLayer, "PHOTO": photoLayer };
+
+      map = L.map('map', { 
+        center: [23.05, 120.2], 
+        zoom: 12, 
+        layers: [emapLayer], 
+        preferCanvas: true, 
+        zoomControl: false 
+      });
+
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-      window.baseMaps = { "深色模式": darkLayer, "一般街道": streetLayer };
 
-      var ReloadControl = L.Control.extend({
+      // 左上角浮動按鈕：重新選擇區段
+      const ReloadControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function() {
-          var div = L.DomUtil.create('div', 'leaflet-control-reload');
-          div.innerHTML = '🔄';
+          const div = L.DomUtil.create('div', 'leaflet-control-custom-btn');
+          div.innerHTML = '⚡';
           div.title = "重新選擇區段";
           div.onclick = function() { 
             localStorage.removeItem('last_selected_prefixes'); 
@@ -308,31 +402,60 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
       });
       map.addControl(new ReloadControl());
 
-      var MasterToggleControl = L.Control.extend({
+      // 右上角浮動面板：圖層開關箱
+      const ToolBoxControl = L.Control.extend({
         options: { position: 'topright' },
         onAdd: function() {
-          var div = L.DomUtil.create('div', 'master-toggle');
-          div.innerHTML = `<div class="master-toggle-title">🛠️ 快速全選控制</div>
-            <label><input type="checkbox" id="toggle-all-heat" checked> 🟥 顯示所有熱力圖</label>
-            <label><input type="checkbox" id="toggle-all-markers"> 📍 顯示所有詳細點位</label>
-            <hr style="margin: 8px 0; border-top: 1px solid #ddd;">
-            <button onclick="loadGodModeLabels()" style="width:100%; padding:8px; background:#1DB446; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">🌍全區標籤</button>`;
+          const div = L.DomUtil.create('div', 'gis-toolbox');
+          div.innerHTML = `
+            <div class="toolbox-title">圖層顯示控制</div>
+            <label class="toolbox-item">
+              <span>🔥 熱力圖層</span>
+              <input type="checkbox" id="toggle-all-heat" checked>
+            </label>
+            <label class="toolbox-item">
+              <span>📍 詳細點位</span>
+              <input type="checkbox" id="toggle-all-markers">
+            </label>
+            <button class="toolbox-btn btn-god" onclick="loadGodModeLabels()">🏷️ 全區標籤</button>
+          `;
           L.DomEvent.disableClickPropagation(div);
 
           div.querySelector('#toggle-all-heat').addEventListener('change', function(e) {
-            for (let key in layersRef.heat) { e.target.checked ? map.addLayer(layersRef.heat[key]) : map.removeLayer(layersRef.heat[key]); }
+            for (let key in layersRef.heat) {
+              e.target.checked ? map.addLayer(layersRef.heat[key]) : map.removeLayer(layersRef.heat[key]);
+            }
           });
           div.querySelector('#toggle-all-markers').addEventListener('change', function(e) {
-            for (let key in layersRef.markers) { e.target.checked ? map.addLayer(layersRef.markers[key]) : map.removeLayer(layersRef.markers[key]); }
+            for (let key in layersRef.markers) {
+              e.target.checked ? map.addLayer(layersRef.markers[key]) : map.removeLayer(layersRef.markers[key]);
+            }
           });
           return div;
         }
       });
-      map.addControl(new MasterToggleControl());
+      map.addControl(new ToolBoxControl());
 
       buildPrefixModal();
     }
 
+    // 底圖切換器
+    function switchBaseMap(type) {
+      document.getElementById('btn-emap').classList.toggle('active', type === 'EMAP');
+      document.getElementById('btn-photo').classList.toggle('active', type === 'PHOTO');
+
+      if (type === 'EMAP') {
+        map.removeLayer(baseLayers["PHOTO"]);
+        map.addLayer(baseLayers["EMAP"]);
+      } else {
+        map.removeLayer(baseLayers["EMAP"]);
+        map.addLayer(baseLayers["PHOTO"]);
+      }
+    }
+
+    // ==========================================
+    // 區段彈窗建置
+    // ==========================================
     async function buildPrefixModal() {
       const container = document.getElementById('prefix-container');
       const cachedPrefixes = localStorage.getItem('power_prefixes_cache');
@@ -340,21 +463,17 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
       if (cachedPrefixes) {
         try {
           const cached = JSON.parse(cachedPrefixes);
-          if (Array.isArray(cached) || !cached.rows) {
-            localStorage.removeItem('power_prefixes_cache');
-            return buildPrefixModal();
+          if (cached && cached.rows) {
+            prefixRows = cached.rows;
+            renderPrefixes(prefixRows);
+            return;
           }
-          prefixRows = cached.rows;
-          renderPrefixes(prefixRows);
         } catch (e) {
           localStorage.removeItem('power_prefixes_cache');
-          return buildPrefixModal();
         }
-        if (prefixRows.length > 0) return;
-        return buildPrefixModal();
       }
 
-      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #1DB446; padding: 20px;">🔄 初次啟動：正在撈取資料...</div>';
+      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--primary); padding: 25px; font-weight:bold;">🔄 正在讀取資料庫分區...</div>';
 
       try {
         const data = await fetchWithFailover("/rest/v1/power_prefix_centers?select=prefix,total_points&order=prefix.asc", "GET");
@@ -364,8 +483,7 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
         localStorage.setItem('power_prefixes_cache', JSON.stringify({ savedAt: Date.now(), rows: prefixRows }));
         renderPrefixes(prefixRows);
       } catch (err) {
-        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: red;">❌ 讀取區段清單失敗，請檢查網路。</div>';
-        console.error("讀取清單失敗:", err);
+        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #ef4444; padding: 20px;">❌ 讀取清單失敗，請確認網路或登入狀態。</div>';
       }
     }
 
@@ -387,7 +505,19 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
         label.dataset.points = row.total_points || 0;
         const isChecked = lastSelected.includes(prefix) ? 'checked' : '';
         if (isChecked) label.classList.add('selected');
-        label.innerHTML = `<input type="checkbox" value="${prefix}" ${isChecked} onchange="updateSelectionSummary()"> <span>${prefix}<small>${formatCompactNumber(row.total_points || 0)} 筆</small></span>`;
+
+        label.innerHTML = `
+          <input type="checkbox" value="${prefix}" ${isChecked}>
+          <span>${prefix}<small>${formatCompactNumber(row.total_points || 0)} 筆</small></span>
+        `;
+        
+        label.addEventListener('click', function(e) {
+          const cb = this.querySelector('input');
+          if (e.target !== cb) cb.checked = !cb.checked;
+          this.classList.toggle('selected', cb.checked);
+          updateSelectionSummary();
+        });
+
         container.appendChild(label);
       });
       updateSelectionSummary();
@@ -429,7 +559,7 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
     }
 
     async function forceRescan() {
-      if(confirm("確定要重新掃描資料庫中的最新區段嗎？")) {
+      if(confirm("確定要重新掃描最新區段中心與統計嗎？")) {
         localStorage.removeItem('power_prefixes_cache'); 
         document.getElementById('prefix-container').innerHTML = ''; 
         await buildPrefixModal(); 
@@ -439,10 +569,16 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
     function toggleAllPrefixes() {
       isAllSelected = !isAllSelected;
       const checkboxes = document.querySelectorAll('#prefix-container .prefix-label:not([style*="display: none"]) input[type="checkbox"]');
-      checkboxes.forEach(cb => cb.checked = isAllSelected);
+      checkboxes.forEach(cb => {
+        cb.checked = isAllSelected;
+        cb.closest('.prefix-label').classList.toggle('selected', isAllSelected);
+      });
       updateSelectionSummary();
     }
 
+    // ==========================================
+    // 資料分頁批次載入
+    // ==========================================
     async function startLoadingData() {
       const checkboxes = document.querySelectorAll('#prefix-container input[type="checkbox"]:checked');
       const selectedPrefixes = Array.from(checkboxes).map(cb => cb.value);
@@ -454,7 +590,7 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
 
       const summary = updateSelectionSummary();
       if (summary.selectedPoints > 30000 || selectedPrefixes.length > 8) {
-        const ok = confirm(`本次約會下載 ${formatCompactNumber(summary.selectedPoints)} 筆資料，可能需要較久時間並消耗資料庫 IO。\n\n確定要繼續載入嗎？`);
+        const ok = confirm(`本次載入約 ${formatCompactNumber(summary.selectedPoints)} 筆點位，可能需要數秒時間。\n\n確定繼續載入？`);
         if (!ok) return;
       }
 
@@ -472,7 +608,7 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
           let hasMore = true;
 
           while (hasMore) {
-            document.getElementById('loading-text').innerHTML = `🌐 下載區段 [${prefix}] 中...<br>(目前累計 ${allData.length} 筆)`;
+            document.getElementById('loading-text').innerHTML = `🌐 下載區段 [${prefix}] 中...<br>(累計 ${allData.length.toLocaleString()} 筆)`;
             const apiPath = `/rest/v1/power_data?power_no=like.${prefix}*&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}&order=power_no.asc`;
             const json = await fetchWithFailover(apiPath, "GET");
             allData = allData.concat(json);
@@ -485,25 +621,22 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
           }
         }
 
-        document.getElementById('loading-text').innerHTML = "🎨 資料下載完成，準備繪製地圖...";
+        document.getElementById('loading-text').innerHTML = "🎨 圖資下載完畢，正在渲染地圖點位...";
         const mappedData = allData.map(r => [r.lat, r.lng, r.power_no || "", r.civil_eng || ""]);
         processData(mappedData);
 
       } catch (err) {
         console.error(err);
-        document.getElementById('loading-text').innerHTML = "載入失敗，請檢查網路或重新整理";
+        document.getElementById('loading-text').innerHTML = "載入失敗，請檢查網路狀態";
       }
     }
 
     function processData(data) {
-      document.getElementById('loading-text').innerHTML = "🎨 繪製圖層中...";
-
       for (let key in layersRef.heat) map.removeLayer(layersRef.heat[key]);
       for (let key in layersRef.markers) map.removeLayer(layersRef.markers[key]);
-      if (layerControl) map.removeControl(layerControl);
 
       layersRef = { heat: {}, markers: {} };
-      let groups = { 'OTHER': {p:[], m:[]} }; 
+      let groups = { 'OTHER': { p: [], m: [] } }; 
       let allBounds = [];
 
       for (let i = 0; i < data.length; i++) {
@@ -525,17 +658,26 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
         }
         groups[prefix].p.push([lat, lng]);
         
-        let circle = L.circleMarker([lat, lng], { radius: 6, fillColor: CONFIG[prefix].hex, color: "#fff", weight: 1, fillOpacity: 0.8 });
+        // 點位樣式
+        let circle = L.circleMarker([lat, lng], { 
+          radius: 6, 
+          fillColor: CONFIG[prefix].hex, 
+          color: "#ffffff", 
+          weight: 1.5, 
+          fillOpacity: 0.85 
+        });
         circle.dataProps = { no: elecNo, name: name, lat: lat, lng: lng }; 
         circle.on('click', function(e) {
           let p = e.target.dataProps;
           let url = "https://www.google.com/maps/search/?api=1&query=" + p.lat + "," + p.lng;
-          let popupContent = 
-            '<div class="info-box">' +
-              '<b style="color:#e74c3c; font-size:16px;">⚡ 電號：' + (p.no || '無') + '</b><br>' +
-              '🏗️ 設備：' + (p.name || '無') + '<br>' +
-              '<a href="' + url + '" target="_blank" class="info-btn">🚗 Google 導航</a>' +
-            '</div>';
+          let popupContent = `
+            <div class="info-box">
+              <div class="info-header">⚡ 電號：${p.no || '無'}</div>
+              <div>🏗️ <b>設備名稱：</b>${p.name || '無'}</div>
+              <div>📍 <b>坐標：</b>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
+              <a href="${url}" target="_blank" class="info-btn">🚗 Google 導航</a>
+            </div>
+          `;
           e.target.bindPopup(popupContent).openPopup();
         });
         
@@ -543,70 +685,70 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
         allBounds.push([lat, lng]); 
       }
 
-      let overlayMaps = {};
       Object.keys(groups).sort().forEach(key => {
         if (groups[key].p.length === 0) return;
 
         let cfg = CONFIG[key];
-        let heat = L.heatLayer(groups[key].p, { radius: 25, blur: 20, maxZoom: 14, minOpacity: 0.5, gradient: cfg.gradient });
+        let heat = L.heatLayer(groups[key].p, { radius: 24, blur: 18, maxZoom: 15, minOpacity: 0.45, gradient: cfg.gradient });
 
         let center = getCenter(groups[key].p);
         let lbl = null;
         if (center) {
-          lbl = L.marker(center, { icon: L.divIcon({className: 'zone-label', html: key, iconSize:[50,24]}), interactive:false });
+          lbl = L.marker(center, { 
+            icon: L.divIcon({ className: 'zone-label', html: key, iconSize: [46, 24] }), 
+            interactive: false 
+          });
         }
 
         let heatGroup = lbl ? L.layerGroup([heat, lbl]) : L.layerGroup([heat]);
         layersRef.heat[key] = heatGroup;
 
-        let displayName = (key === 'OTHER') ? '未知區 (OTHER)' : key;
         if (key !== 'OTHER') {
           map.addLayer(heatGroup);
         }
-        
-        overlayMaps["<span style='color:" + cfg.hex + "'>■</span> " + displayName + " 熱力圖"] = heatGroup;
 
-        let cluster = L.markerClusterGroup({ disableClusteringAtZoom: 18, spiderfyOnMaxZoom: false, maxClusterRadius: 80, chunkedLoading: true });
+        let cluster = L.markerClusterGroup({ 
+          disableClusteringAtZoom: 18, 
+          spiderfyOnMaxZoom: false, 
+          maxClusterRadius: 70, 
+          chunkedLoading: true 
+        });
         cluster.addLayers(groups[key].m);
         layersRef.markers[key] = cluster;
-        overlayMaps["📍 " + displayName + " 詳細點位"] = cluster;
       });
 
-      layerControl = L.control.layers(window.baseMaps, overlayMaps, { collapsed: true }).addTo(map);
       document.getElementById('loading').style.display = 'none';
 
       if (allBounds.length > 0) {
-        map.fitBounds(allBounds, { padding: [30, 30] });
+        map.fitBounds(allBounds, { padding: [40, 40] });
       }
     }
 
     function getCenter(p) { 
-      if(p.length===0) return null; 
-      let la=0, lo=0; 
-      for(let i=0; i<p.length; i++){ la+=p[i][0]; lo+=p[i][1]; } 
-      return [la/p.length, lo/p.length]; 
+      if(p.length === 0) return null; 
+      let la = 0, lo = 0; 
+      for(let i = 0; i < p.length; i++) { la += p[i][0]; lo += p[i][1]; } 
+      return [la / p.length, lo / p.length]; 
     }
 
     // ==========================================
-    // ★ 上帝視角：讀取實體化視圖 + 可顯示/隱藏標籤
+    // 上帝視角：全區中心標籤
     // ==========================================
     let godModeLayer = null;   
     let godModeVisible = false; 
 
     async function loadGodModeLabels() {
-      const btn = document.querySelector('button[onclick="loadGodModeLabels()"]');
-      let originalText = btn.innerHTML;
+      const btn = document.querySelector('.btn-god');
 
       if (godModeVisible) {
         map.removeLayer(godModeLayer);
         godModeVisible = false;
-        btn.innerHTML = "🌍全區標籤";
-        btn.style.background = "#1DB446";
+        btn.classList.remove('active');
+        btn.innerHTML = "🏷️ 全區標籤";
         return;
       }
 
-      btn.innerHTML = "⏳ 雲端計算中...";
-      btn.style.background = "#f39c12";
+      btn.innerHTML = "⏳ 載入中...";
 
       try {
         godModeLayer = L.layerGroup();
@@ -618,11 +760,11 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
             icon: L.divIcon({
               className: 'zone-label',
               html: `
-                <span style="color:#e74c3c;font-weight:900;font-size:16px;">${row.prefix}</span><br>
-                <span style="font-size:11px;color:#555;">(${row.total_points} 筆)</span>
+                <span style="color:#10b981;font-weight:900;font-size:15px;">${row.prefix}</span><br>
+                <span style="font-size:11px;color:#cbd5e1;">(${row.total_points} 筆)</span>
               `,
-              iconSize: [70, 50],
-              iconAnchor: [35, 25]
+              iconSize: [68, 44],
+              iconAnchor: [34, 22]
             })
           });
 
@@ -632,19 +774,15 @@ const darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servi
 
         godModeLayer.addTo(map);
         godModeVisible = true;
-
-        btn.innerHTML = "🙈 隱藏全區標籤";
-        btn.style.background = "#2c3e50";
+        btn.classList.add('active');
+        btn.innerHTML = "🙈 隱藏標籤";
 
         if (bounds.length > 0) {
           map.fitBounds(bounds, { padding: [50, 50] });
         }
-
       } catch (err) {
-        console.error("載入失敗:", err);
-        alert("載入失敗，請檢查網路。");
-        btn.innerHTML = originalText;
-        btn.style.background = "#1DB446";
+        alert("載入標籤失敗，請檢查網路狀態。");
+        btn.innerHTML = "🏷️ 全區標籤";
       }
     }
   </script>
