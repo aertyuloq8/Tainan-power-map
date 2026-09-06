@@ -176,73 +176,76 @@
       throw new Error("❌ 所有主機皆無法連線"); 
     }
 
-    // ==========================================
-    // ★ 系統安全鎖 (升級為 OTP 單次動態碼認證)
+// ==========================================
+    // ★ 系統安全鎖 (手機 LINE 自動免密登入 + 電腦 OTP 驗證)
     // ==========================================
     async function initSecurityCheck() {
       try { 
+        // 1. 初始化 LINE LIFF SDK
         await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
 
-        // 1. 檢查短期 Session 記憶體，重新整理頁面無須再次輸入
+        // 2. 如果瀏覽器記憶體已有通行證（重新整理時），直接放行
         const cachedToken = sessionStorage.getItem('session_access_token');
         if (cachedToken) {
           currentAccessToken = cachedToken;
           return true; 
         }
 
-        let inputOtp = "";
-        const urlParams = new URLSearchParams(window.location.search);
-        const tokenFromUrl = urlParams.get('otp') || urlParams.get('token');
+        let requestPayload = {};
 
-        if (tokenFromUrl) {
-          // 2. 如果網址帶有參數，使用後立即抹除歷程紀錄
-          inputOtp = tokenFromUrl;
-          window.history.replaceState(null, null, window.location.pathname);
+        // 3. 判斷環境：是否在手機 LINE App 內部開啟？
+        if (liff.isInClient()) {
+          // 👉 手機 LINE 內部開啟：啟用免輸入自動通關模式
+          document.getElementById('loading').style.display = 'flex';
+          document.getElementById('loading-text').innerHTML = "⚡ LINE 身分安全核驗中...";
+          requestPayload = { is_line_client: true };
         } else {
-          // 3. 電腦瀏覽器開啟：要求輸入 6 位數 LINE 動態登入碼
-          inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 官方帳號派發的 6 位數電腦登入碼：\n（可至 LINE 聊天室傳送「電腦登入」取得）");
-          if (!inputOtp) return blockAccess();
+          // 👉 電腦瀏覽器開啟：跳出 6 位數輸入視窗
+          let inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 派發的 6 位數電腦登入碼：\n（請至 LINE 聊天室傳送「電腦登入」獲取）");
+          if (!inputOtp) return blockAccess("未輸入驗證碼");
+          requestPayload = { otp: inputOtp.trim() };
         }
 
-        // 4. 呼叫後端 Edge Function 檢驗 OTP 並換發 Access Token
+        // 4. 呼叫後端 Edge Function
         const response = await fetch(EDGE_AUTH_URL, {
           method: "POST",
           headers: {
             "apikey": DB_CONFIGS[0].key,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ otp: inputOtp.trim() })
+          body: JSON.stringify(requestPayload)
         });
 
         const result = await response.json();
 
         if (response.ok && result.access_token) {
+          // 驗證通過，儲存通行證
           currentAccessToken = result.access_token;
           sessionStorage.setItem('session_access_token', currentAccessToken);
           return true; 
         } else {
           sessionStorage.removeItem('session_access_token');
-          alert("❌ 驗證碼錯誤或已過期！\n請至 LINE 聊天室傳送「電腦登入」重新領取。");
-          return blockAccess();
+          // 顯示後端回傳的確切錯誤原因
+          alert("❌ 驗證未通過：\n" + (result.error || "未知錯誤，請重新整理"));
+          return blockAccess(result.error);
         }
       } catch (err) { 
         sessionStorage.removeItem('session_access_token');
-        console.error("登入驗證失敗:", err); 
-        alert("❌ 驗證連線失敗，請檢查網路狀態或確認驗證碼！");
-        return blockAccess();
+        console.error("登入異常:", err); 
+        alert("❌ 系統連線異常：" + err.message);
+        return blockAccess("系統連線異常");
       }
     }
 
-    // 拒絕存取畫面 (附帶重整按鈕)
-    function blockAccess() {
+    function blockAccess(reason) {
       document.body.innerHTML = `
         <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px; box-sizing:border-box;">
           <h1 style="color:#e74c3c; margin-bottom:10px;">⛔ 存取被拒</h1>
           <p style="color:#aaa; font-size:15px; max-width:400px; line-height:1.6;">
-            請至 LINE 機器人傳送「<strong>電腦登入</strong>」取得 6 位數動態驗證碼，並重新輸入以完成身分驗證。
+            ${reason || "請從官方 LINE 開啟，或輸入正確的 6 位數電腦登入碼。"}
           </p>
           <button onclick="location.reload()" style="margin-top:20px; padding:10px 24px; background:#1DB446; color:white; border:none; border-radius:6px; font-weight:bold; font-size:15px; cursor:pointer;">
-            🔄 重新整理並輸入
+            🔄 重新整理
           </button>
         </div>
       `;
