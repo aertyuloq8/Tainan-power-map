@@ -13,12 +13,11 @@
       --danger-red: #ff4d4f;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: 12px;
       background-color: var(--bg-gray);
       color: #333;
       margin: 0;
-      box-sizing: border-box;
     }
     .container {
       max-width: 500px;
@@ -29,7 +28,7 @@
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
     }
     
-    /* 頁籤切換 */
+    /* 頁籤 */
     .tabs {
       display: flex;
       margin-bottom: 15px;
@@ -46,7 +45,7 @@
       color: #666;
       font-weight: 600;
       font-size: 14px;
-      transition: all 0.2s ease;
+      transition: all 0.2s;
     }
     .tab.active {
       background: white;
@@ -54,10 +53,8 @@
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
     
-    /* 表單項目 */
-    .form-group {
-      margin-bottom: 12px;
-    }
+    /* 表單 */
+    .form-group { margin-bottom: 12px; }
     label {
       display: block;
       margin-bottom: 6px;
@@ -73,14 +70,13 @@
       box-sizing: border-box;
       font-size: 16px;
       background: #fff;
-      color: #333;
     }
     input:focus, select:focus {
       border-color: var(--line-green);
       outline: none;
     }
 
-    /* 錯誤提示框 */
+    /* 錯誤提示 */
     .alert-box {
       display: none;
       background-color: #fff2f0;
@@ -104,13 +100,10 @@
       font-weight: bold;
       margin-top: 14px;
       cursor: pointer;
-      transition: background 0.2s;
     }
-    .btn-calc:active {
-      background: #179b3c;
-    }
+    .btn-calc:active { background: #179b3c; }
     
-    /* 結果卡片樣式 */
+    /* 結果卡片 */
     #result-area {
       margin-top: 20px;
       display: none;
@@ -141,7 +134,7 @@
       font-weight: normal;
     }
     
-    /* 數據方塊 */
+    /* 統計資訊方塊 */
     .info-box {
       background: #f8f9fa;
       border-radius: 8px;
@@ -154,12 +147,8 @@
       justify-content: space-between;
       margin-bottom: 6px;
     }
-    .row:last-child {
-      margin-bottom: 0;
-    }
-    .row b {
-      color: var(--non-blue);
-    }
+    .row:last-child { margin-bottom: 0; }
+    .row b { color: var(--non-blue); }
     
     /* 明細區塊 */
     .detail-title {
@@ -226,7 +215,7 @@
     </select>
   </div>
 
-  <!-- 電費試算模式 -->
+  <!-- 模式一：輸入總度數 -->
   <div id="form-bill">
     <div class="form-group">
       <label for="b-kwh">⚡ 用電度數</label>
@@ -242,7 +231,7 @@
     </div>
   </div>
 
-  <!-- 日均抄表試算模式 -->
+  <!-- 模式二：輸入電表指數 -->
   <div id="form-avg" class="hidden">
     <div class="form-group">
       <label for="a-lastIdx">📖 上次指數</label>
@@ -253,11 +242,11 @@
       <input type="number" id="a-currIdx" inputmode="decimal" min="0" step="any" placeholder="本次電表讀數">
     </div>
     <div class="form-group">
-      <label for="a-lastDate">📅 上次抄表日期</label>
+      <label for="a-lastDate">📅 上次日期</label>
       <input type="date" id="a-lastDate">
     </div>
     <div class="form-group">
-      <label for="a-currDate">📅 本次抄表日期</label>
+      <label for="a-currDate">📅 本次日期</label>
       <input type="date" id="a-currDate">
     </div>
   </div>
@@ -270,8 +259,7 @@
 
   <div class="footer-note">
     費率依據：114年10月1日實施版本<br>
-    非雙月週期級距依實際天數等比縮放<br>
-    ※ 試算結果不含底度與扣減項目，實際金額以台電帳單為準。
+    ※ 試算結果僅供參考，實際金額以台電帳單為準。
   </div>
 </div>
 
@@ -279,9 +267,8 @@
 
 <script>
   let currentMode = 'bill';
-  
-  // 台電雙月標準級距 (以 61 天為基期)
-  const STANDARD_DAYS = 61;
+
+  // 台電固定分段級距與各級費率
   const CONFIG = {
     HOME: { 
       name: "🏠 住家試算", 
@@ -303,7 +290,7 @@
     }
   };
 
-  // 避免 UTC 造成跨日計算誤差的本機日期解析
+  // 本地日期解析（避免 UTC 造成的跨日時區偏移）
   function parseLocalDate(dateStr) {
     if (!dateStr || typeof dateStr !== 'string') return null;
     const parts = dateStr.split('-');
@@ -319,19 +306,19 @@
     return `${year}-${month}-${day}`;
   }
 
-  // 預設日期初始化：結束日為今日，起始日預設為 61 天前 (一期標準週期)
+  // 預設日期（結束日為今日，起始日預設為 61 天前）
   function initDefaultDates() {
     const today = new Date();
-    const prevPeriod = new Date();
-    prevPeriod.setDate(today.getDate() - STANDARD_DAYS);
+    const past = new Date();
+    past.setDate(today.getDate() - 61);
 
     const todayStr = formatDateToString(today);
-    const prevStr = formatDateToString(prevPeriod);
+    const pastStr = formatDateToString(past);
 
     document.getElementById('b-end').value = todayStr;
-    document.getElementById('b-start').value = prevStr;
+    document.getElementById('b-start').value = pastStr;
     document.getElementById('a-currDate').value = todayStr;
-    document.getElementById('a-lastDate').value = prevStr;
+    document.getElementById('a-lastDate').value = pastStr;
   }
 
   // LIFF 初始化
@@ -341,7 +328,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('mode') === 'avg') switchTab('avg');
     } catch (err) {
-      console.warn("LIFF 初始化跳過或失敗，維持標準網頁模式運作:", err);
+      console.warn("LIFF 未啟用或載入失敗，維持單機運作:", err);
     }
   }
 
@@ -396,7 +383,7 @@
         return;
       }
       if (cIdx < lIdx) {
-        showError("本次指數小於上次指數。若遇到電表翻轉歸零，請手動折算加上萬位基數。");
+        showError("本次指數小於上次指數，請檢查數值是否相反。");
         return;
       }
       kwh = cIdx - lIdx;
@@ -404,12 +391,12 @@
     }
 
     if (!start || !end) {
-      showError("請選取完整的計算日期。");
+      showError("請選取完整的計費期間。");
       return;
     }
 
     if (end <= start) {
-      showError("結束日期必須大於起始日期至少 1 天。");
+      showError("結束日期必須大於起始日期。");
       return;
     }
 
@@ -418,17 +405,15 @@
       return;
     }
 
-    // 計算實際日數
+    // 計算實際天數
     const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000);
 
-    // 計算夏月天數 (6/1 至 9/30)
+    // 計算夏月天數（每年 6/1 ~ 9/30）
     let summerDays = 0;
     let scanDate = new Date(start.getTime());
     for (let i = 0; i < totalDays; i++) {
       const m = scanDate.getMonth() + 1;
-      if (m >= 6 && m <= 9) {
-        summerDays++;
-      }
+      if (m >= 6 && m <= 9) summerDays++;
       scanDate.setDate(scanDate.getDate() + 1);
     }
 
@@ -436,30 +421,21 @@
     const ratioS = summerDays / totalDays;
     const ratioN = nonSummerDays / totalDays;
 
-    // 依天數等比調整級距 (非雙月 61 天週期等比縮放)
-    const scaleFactor = totalDays / STANDARD_DAYS;
-    const scaledTiers = config.tiers.map(val => val * scaleFactor);
-
+    // 依固定級距計算各段電費（天數純粹用於分配夏月/非夏月比例）
     let totalBill = 0;
     let rem = kwh;
     let detailsHtml = "";
 
     for (let i = 0; i < config.summer.length; i++) {
-      const limit = scaledTiers[i] || null;
-      const prev = scaledTiers[i - 1] || 0;
+      const limit = config.tiers[i] || null;
+      const prev = config.tiers[i - 1] || 0;
       const rangeCapacity = (limit === null) ? rem : Math.max(0, limit - prev);
       const rangeKwh = Math.min(rem, rangeCapacity);
 
       if (rangeKwh > 0) {
-        // 級距標籤顯示（小數點後 1 位）
-        let label = "";
-        if (limit === null) {
-          label = `${prev.toFixed(1)} 度以上`;
-        } else if (i === 0) {
-          label = `1 ~ ${limit.toFixed(1)} 度`;
-        } else {
-          label = `${prev.toFixed(1)} ~ ${limit.toFixed(1)} 度`;
-        }
+        const label = (limit === null) 
+          ? `${prev + 1}度以上` 
+          : (i === 0 ? `1~${limit}度` : `${prev + 1}~${limit}度`);
 
         const costS = rangeKwh * ratioS * config.summer[i];
         const costN = rangeKwh * ratioN * config.nonSummer[i];
@@ -469,18 +445,18 @@
         detailsHtml += `
           <div class="tier-box">
             <div class="tier-header">
-              <span>${label} (${rangeKwh.toFixed(1)} 度)</span>
+              <span>${label} (${rangeKwh.toFixed(1)}度)</span>
               <span>$${subTotal.toLocaleString()}</span>
             </div>
             ${summerDays > 0 ? `
               <div class="sub-row">
                 <span class="tag tag-summer">夏月</span>
-                ${(rangeKwh * ratioS).toFixed(1)} 度 × $${config.summer[i]} = $${Math.round(costS).toLocaleString()}
+                ${(rangeKwh * ratioS).toFixed(1)}度 × $${config.summer[i]} = $${Math.round(costS).toLocaleString()}
               </div>` : ''}
             ${nonSummerDays > 0 ? `
               <div class="sub-row">
                 <span class="tag tag-non">非夏月</span>
-                ${(rangeKwh * ratioN).toFixed(1)} 度 × $${config.nonSummer[i]} = $${Math.round(costN).toLocaleString()}
+                ${(rangeKwh * ratioN).toFixed(1)}度 × $${config.nonSummer[i]} = $${Math.round(costN).toLocaleString()}
               </div>` : ''}
           </div>
         `;
@@ -502,8 +478,8 @@
         ` : ''}
         <div class="row"><b>📊 日均度數</b><b>${(kwh / totalDays).toFixed(2)} 度/日</b></div>
         <div class="row"><span>總用電量</span><span>${kwh.toLocaleString()} 度</span></div>
-        <div class="row"><span>計費天數</span><span>${totalDays} 天 (基期縮放比 ${(scaleFactor).toFixed(2)})</span></div>
-        <div class="row"><span>夏月 / 非夏月分佈</span><span>🌞 ${summerDays} 天 / 🌬️ ${nonSummerDays} 天</span></div>
+        <div class="row"><span>計算天數</span><span>${totalDays} 天</span></div>
+        <div class="row"><span>天數分佈</span><span>🌞 ${summerDays}天 / 🌬️ ${nonSummerDays}天</span></div>
       </div>
       <div class="detail-title">費用分攤明細</div>
       ${detailsHtml}
@@ -512,7 +488,7 @@
     resultArea.scrollIntoView({ behavior: 'smooth' });
   }
 
-  // 畫面載入初始化
+  // 初始化執行
   initDefaultDates();
   initLiff();
 </script>
