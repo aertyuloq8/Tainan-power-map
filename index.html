@@ -19,8 +19,9 @@
       --primary: #10b981;
       --primary-dark: #059669;
       --primary-light: #e8f8ee;
+      --gis-teal: #00796b;
       --dark: #0f172a;
-      --surface: rgba(255, 255, 255, 0.95);
+      --surface: rgba(255, 255, 255, 0.96);
       --border: #e2e8f0;
       --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     }
@@ -43,62 +44,70 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     #loading-text { font-size: 16px; font-weight: bold; text-align: center; line-height: 1.6; }
 
-    /* 頂部底圖切換膠囊 */
-    .basemap-pill {
-      position: absolute; top: 14px; left: 62px; z-index: 1000;
-      background: var(--surface); backdrop-filter: blur(10px);
-      padding: 4px; border-radius: 30px; box-shadow: var(--shadow);
-      display: flex; gap: 4px; border: 1px solid rgba(255, 255, 255, 0.8);
-    }
-    .pill-btn {
-      border: none; background: transparent; padding: 7px 14px;
-      border-radius: 20px; font-size: 13px; font-weight: 700;
-      color: #64748b; cursor: pointer; transition: all 0.2s ease;
-      display: flex; align-items: center; gap: 5px;
-    }
-    .pill-btn.active {
-      background: var(--primary); color: white;
-      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
-    }
-
-    /* 右上角：整合式可收合圖層面板 */
-    .gis-toolbox {
-      background: var(--surface); backdrop-filter: blur(12px);
-      border-radius: 16px; box-shadow: var(--shadow);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      overflow: hidden; min-width: 190px; transition: all 0.25s ease;
-    }
-    .toolbox-header {
-      padding: 10px 14px; font-size: 13.5px; font-weight: 800; color: #334155;
-      display: flex; justify-content: space-between; align-items: center;
-      cursor: pointer; user-select: none; background: rgba(241, 245, 249, 0.7);
-    }
-    .toolbox-header:hover { background: #f1f5f9; }
-    .toolbox-arrow { font-size: 11px; transition: transform 0.25s ease; }
-    .toolbox-body { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
-    .gis-toolbox.collapsed .toolbox-body { display: none; }
-    .gis-toolbox.collapsed .toolbox-arrow { transform: rotate(-90deg); }
-
-    .toolbox-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 0; font-size: 13.5px; font-weight: 700; color: #1e293b;
-      cursor: pointer; user-select: none;
-    }
-    .toolbox-item input[type="checkbox"] {
-      width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; margin: 0;
-    }
-
     /* 左上角重整按鈕 */
-    .leaflet-control-custom-btn {
+    .leaflet-control-reload-btn {
       background: var(--surface) !important; backdrop-filter: blur(10px);
-      width: 40px !important; height: 40px !important; line-height: 40px !important;
+      width: 44px !important; height: 44px !important; line-height: 44px !important;
       border-radius: 12px !important; cursor: pointer; text-align: center;
       box-shadow: var(--shadow) !important; border: 1px solid rgba(255, 255, 255, 0.8) !important;
-      font-size: 19px; transition: transform 0.15s ease; user-select: none;
+      font-size: 20px; transition: transform 0.15s ease; user-select: none;
     }
-    .leaflet-control-custom-btn:hover { transform: scale(1.06); }
+    .leaflet-control-reload-btn:hover { transform: scale(1.06); }
 
-    /* 區段彈窗 */
+    /* ★★★ 右上角：圖2專用「圖層」懸浮按鈕 ★★★ */
+    .layer-control-btn {
+      position: absolute; top: 14px; right: 14px; z-index: 1000;
+      background: var(--surface); backdrop-filter: blur(10px);
+      width: 54px; height: 54px; border-radius: 14px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s ease; user-select: none;
+    }
+    .layer-control-btn:hover { transform: scale(1.05); }
+    .layer-control-btn:active { transform: scale(0.96); }
+    .layer-control-btn span {
+      font-size: 11px; font-weight: 800; color: var(--gis-teal); margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ★★★ 圖層與底圖設定抽屜面板 ★★★ */
+    .layer-menu-panel {
+      position: absolute; top: 76px; right: 14px; z-index: 1000;
+      background: var(--surface); backdrop-filter: blur(14px);
+      border-radius: 18px; box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      width: 220px; padding: 14px; display: none; flex-direction: column;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .layer-menu-panel.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .layer-menu-header {
+      font-size: 14px; font-weight: 800; color: var(--dark);
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+    }
+    .layer-close-btn {
+      border: none; background: #f1f5f9; width: 22px; height: 22px;
+      border-radius: 50%; font-size: 12px; font-weight: bold; cursor: pointer; color: #64748b;
+    }
+    .layer-section-title {
+      font-size: 11.5px; font-weight: 800; color: #64748b; margin-bottom: 6px; text-transform: uppercase;
+    }
+    .layer-item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 0; font-size: 13.5px; font-weight: 700; color: #1e293b;
+      cursor: pointer; user-select: none;
+    }
+    .layer-item-row input {
+      width: 17px; height: 17px; accent-color: var(--primary); cursor: pointer; margin: 0;
+    }
+    .layer-divider {
+      height: 1px; background: var(--border); border: none; margin: 8px 0;
+    }
+
+    /* 區段選擇彈窗 */
     #prefix-modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); z-index: 10000;
@@ -163,24 +172,52 @@
       background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 9px;
       text-align: center; border-radius: 10px; font-weight: 700; box-shadow: 0 3px 8px rgba(16, 185, 129, 0.35);
     }
-
-    @media (max-width: 600px) {
-      .basemap-pill { left: 54px; top: 12px; }
-      .pill-btn { padding: 6px 11px; font-size: 12px; }
-      .gis-toolbox { min-width: 165px; }
-    }
   </style>
 </head>
 <body>
 
-  <!-- 底圖切換膠囊 -->
-  <div class="basemap-pill">
-    <button class="pill-btn active" id="btn-emap" onclick="switchBaseMap('EMAP')">
-      🗺️ 臺灣電子地圖
-    </button>
-    <button class="pill-btn" id="btn-photo" onclick="switchBaseMap('PHOTO')">
-      🛰️ 正射航照圖
-    </button>
+  <!-- ★★★ 圖2樣式：右上角獨立圖層按鈕 ★★★ -->
+  <div class="layer-control-btn" onclick="toggleLayerMenu()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00796b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+      <polyline points="2 17 12 22 22 17"></polyline>
+      <polyline points="2 12 12 17 22 12"></polyline>
+    </svg>
+    <span>圖層</span>
+  </div>
+
+  <!-- ★★★ 整合底圖與圖資的彈出面板 ★★★ -->
+  <div class="layer-menu-panel" id="layer-menu-panel">
+    <div class="layer-menu-header">
+      <span>🗂️ 圖層與底圖</span>
+      <button class="layer-close-btn" onclick="toggleLayerMenu()">✕</button>
+    </div>
+    
+    <div class="layer-section-title">🗺️ 底圖選擇</div>
+    <label class="layer-item-row">
+      <span>臺灣通用電子地圖</span>
+      <input type="radio" name="basemap" value="EMAP" checked onchange="switchBaseMap('EMAP')">
+    </label>
+    <label class="layer-item-row">
+      <span>正射影像 (航照圖)</span>
+      <input type="radio" name="basemap" value="PHOTO" onchange="switchBaseMap('PHOTO')">
+    </label>
+
+    <hr class="layer-divider">
+
+    <div class="layer-section-title">📌 圖資顯示</div>
+    <label class="layer-item-row">
+      <span>🔥 熱力圖層</span>
+      <input type="checkbox" id="toggle-all-heat" checked onchange="toggleAllHeat(this.checked)">
+    </label>
+    <label class="layer-item-row">
+      <span>📍 詳細點位</span>
+      <input type="checkbox" id="toggle-all-markers" onchange="toggleAllMarkers(this.checked)">
+    </label>
+    <label class="layer-item-row">
+      <span>🏷️ 全區中心標籤</span>
+      <input type="checkbox" id="toggle-all-labels" onchange="toggleGodModeLabels(this.checked)">
+    </label>
   </div>
 
   <!-- 區段選擇彈窗 -->
@@ -213,9 +250,6 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <script>
-    // ==========================================
-    // ★ 雙主機自動備援設定
-    // ==========================================
     const DB_CONFIGS = [
       {
         name: "新主機 (主力)",
@@ -230,7 +264,6 @@
     ];
 
     const EDGE_AUTH_URL = "https://gdpcyoogacdkwuozmbbw.supabase.co/functions/v1/hyper-responder";
-
     const COLOR_PALETTE = ['#e11d48', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#db2777', '#ca8a04', '#4f46e5', '#059669'];
     let CONFIG = { 'OTHER': { color: 'gray', hex: '#64748b', gradient: {0.4: '#64748b', 1: '#0f172a'} } };
 
@@ -273,13 +306,18 @@
     }
 
     // ==========================================
-    // ★ 系統安全鎖
+    // ★ 系統安全鎖 (修復 LINE 內卡死問題)
     // ==========================================
     async function initSecurityCheck() {
       try { 
+        // 1. 初始化 LIFF (加上 3 秒防逾時保證，防止 LINE App 內部無限卡住)
         if (window.liff && typeof liff.init === 'function') {
-          try { await liff.init({ liffId: "2009264862-z2kqi1C3" }); } catch(e) {}
+          await Promise.race([
+            liff.init({ liffId: "2009264862-z2kqi1C3" }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("LIFF Init Timeout")), 3000))
+          ]).catch(e => console.warn("LIFF 初始化跳過:", e));
         }
+
         if (window.Telegram && window.Telegram.WebApp) {
           window.Telegram.WebApp.ready();
         }
@@ -328,6 +366,8 @@
         if (response.ok && result.access_token) {
           currentAccessToken = result.access_token;
           sessionStorage.setItem('session_access_token', currentAccessToken);
+          
+          // ★★★ 核心必修：核驗通過後，立刻關閉 Loading 遮罩，露出選區彈窗 ★★★
           document.getElementById('loading').style.display = 'none';
           return true; 
         } else {
@@ -339,7 +379,7 @@
       } catch (err) { 
         sessionStorage.removeItem('session_access_token');
         document.getElementById('loading').style.display = 'none';
-        alert("❌ 身分核驗連線異常：" + (err.name === 'AbortError' ? '連線逾時' : err.message));
+        alert("❌ 身分核驗異常：" + (err.name === 'AbortError' ? '連線逾時' : err.message));
         return blockAccess("系統連線異常");
       }
     }
@@ -394,11 +434,11 @@
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // 左上角浮動按鈕：重新選擇區段 (改回原始重整圖示 🔄)
+      // 左上角浮動按鈕：重新選擇區段 (使用原始重整圖示 🔄)
       const ReloadControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function() {
-          const div = L.DomUtil.create('div', 'leaflet-control-custom-btn');
+          const div = L.DomUtil.create('div', 'leaflet-control-reload-btn');
           div.innerHTML = '🔄';
           div.title = "重新選擇區段";
           div.onclick = function() { 
@@ -410,48 +450,27 @@
       });
       map.addControl(new ReloadControl());
 
-      // 右上角：整合式圖層控制箱 (可收合/展開)
-      const ToolBoxControl = L.Control.extend({
-        options: { position: 'topright' },
-        onAdd: function() {
-          const div = L.DomUtil.create('div', 'gis-toolbox');
-          div.id = 'gis-toolbox-panel';
-          div.innerHTML = `
-            <div class="toolbox-header" onclick="toggleToolbox()">
-              <span>🗂️ 圖層與標籤</span>
-              <span class="toolbox-arrow">▼</span>
-            </div>
-            <div class="toolbox-body">
-              <label class="toolbox-item">
-                <span>🔥 熱力圖層</span>
-                <input type="checkbox" id="toggle-all-heat" checked onchange="toggleAllHeat(this.checked)">
-              </label>
-              <label class="toolbox-item">
-                <span>📍 詳細點位</span>
-                <input type="checkbox" id="toggle-all-markers" onchange="toggleAllMarkers(this.checked)">
-              </label>
-              <label class="toolbox-item">
-                <span>🏷️ 全區中心標籤</span>
-                <input type="checkbox" id="toggle-all-labels" onchange="toggleGodModeLabels(this.checked)">
-              </label>
-            </div>
-          `;
-          L.DomEvent.disableClickPropagation(div);
-          return div;
-        }
-      });
-      map.addControl(new ToolBoxControl());
-
       buildPrefixModal();
     }
 
-    // 收合 / 展開圖層箱
-    function toggleToolbox() {
-      const box = document.getElementById('gis-toolbox-panel');
-      if (box) box.classList.toggle('collapsed');
+    // ★★★ 圖層選單開啟 / 關閉切換 ★★★
+    function toggleLayerMenu() {
+      const panel = document.getElementById('layer-menu-panel');
+      panel.classList.toggle('active');
     }
 
-    // 圖層連動控制
+    // 底圖切換
+    function switchBaseMap(type) {
+      if (type === 'EMAP') {
+        map.removeLayer(baseLayers["PHOTO"]);
+        map.addLayer(baseLayers["EMAP"]);
+      } else {
+        map.removeLayer(baseLayers["EMAP"]);
+        map.addLayer(baseLayers["PHOTO"]);
+      }
+    }
+
+    // 圖資圖層切換
     function toggleAllHeat(checked) {
       for (let key in layersRef.heat) {
         checked ? map.addLayer(layersRef.heat[key]) : map.removeLayer(layersRef.heat[key]);
@@ -513,22 +532,8 @@
       }
     }
 
-    // 底圖切換器
-    function switchBaseMap(type) {
-      document.getElementById('btn-emap').classList.toggle('active', type === 'EMAP');
-      document.getElementById('btn-photo').classList.toggle('active', type === 'PHOTO');
-
-      if (type === 'EMAP') {
-        map.removeLayer(baseLayers["PHOTO"]);
-        map.addLayer(baseLayers["EMAP"]);
-      } else {
-        map.removeLayer(baseLayers["EMAP"]);
-        map.addLayer(baseLayers["PHOTO"]);
-      }
-    }
-
     // ==========================================
-    // 區段彈窗渲染（修復點擊選取問題）
+    // 區段彈窗渲染
     // ==========================================
     async function buildPrefixModal() {
       const container = document.getElementById('prefix-container');
@@ -580,7 +585,6 @@
         label.dataset.prefix = prefix;
         label.dataset.points = row.total_points || 0;
 
-        // ★ 核心修復：使用標準 onchange 連動樣式，徹底避免點擊衝突
         label.innerHTML = `
           <input type="checkbox" value="${prefix}" ${isChecked ? 'checked' : ''} onchange="handlePrefixChange(this)">
           <span>${prefix}<small>${formatCompactNumber(row.total_points || 0)} 筆</small></span>
