@@ -279,14 +279,24 @@
     // ==========================================
     // ★ 系統安全鎖 (LINE / Telegram 雙軌驗證)
     // ==========================================
+// ==========================================
+    // ★ 系統安全鎖 (修復第二度開啟卡死問題)
+    // ==========================================
     async function initSecurityCheck() {
       try { 
-        if (window.liff) await liff.init({ liffId: "2009264862-z2kqi1C3" });
-        if (window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.ready();
+        // 1. 初始化 SDK (加上防呆)
+        if (window.liff && typeof liff.init === 'function') {
+          try { await liff.init({ liffId: "2009264862-z2kqi1C3" }); } catch(e) {}
+        }
+        if (window.Telegram && window.Telegram.WebApp) {
+          window.Telegram.WebApp.ready();
+        }
 
+        // 2. 如果短期記憶已有通行證，直接放行並確保遮罩關閉
         const cachedToken = sessionStorage.getItem('session_access_token');
         if (cachedToken) {
           currentAccessToken = cachedToken;
+          document.getElementById('loading').style.display = 'none';
           return true; 
         }
 
@@ -294,6 +304,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const otpFromUrl = urlParams.get('otp') || urlParams.get('token');
 
+        // 3. 智慧多軌判斷
         if (otpFromUrl) {
           window.history.replaceState(null, null, window.location.pathname);
           requestPayload = { otp: otpFromUrl.trim() };
@@ -311,25 +322,38 @@
           requestPayload = { otp: inputOtp.trim() };
         }
 
+        // 4. 呼叫後端 Edge Function (加入 8 秒超時保護，防止網路塞車無限卡住)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
         const response = await fetch(EDGE_AUTH_URL, {
           method: "POST",
           headers: { "apikey": DB_CONFIGS[0].key, "Content-Type": "application/json" },
-          body: JSON.stringify(requestPayload)
+          body: JSON.stringify(requestPayload),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         const result = await response.json();
+
         if (response.ok && result.access_token) {
           currentAccessToken = result.access_token;
           sessionStorage.setItem('session_access_token', currentAccessToken);
+          
+          // ★★★ 關鍵修正：核驗通過後，立刻關閉核驗載入黑屏，露出區段選擇視窗 ★★★
+          document.getElementById('loading').style.display = 'none';
           return true; 
         } else {
           sessionStorage.removeItem('session_access_token');
+          document.getElementById('loading').style.display = 'none';
           alert("❌ 驗證未通過：\n" + (result.error || "未知錯誤"));
           return blockAccess(result.error);
         }
       } catch (err) { 
         sessionStorage.removeItem('session_access_token');
-        alert("❌ 連線異常：" + err.message);
+        document.getElementById('loading').style.display = 'none';
+        console.error("登入異常:", err);
+        alert("❌ 身分核驗連線異常：" + (err.name === 'AbortError' ? '連線逾時' : err.message));
         return blockAccess("系統連線異常");
       }
     }
