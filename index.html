@@ -93,8 +93,7 @@
         <input class="prefix-search" id="prefix-search" type="search" placeholder="搜尋區段，例如 1001" oninput="filterPrefixes()">
         <div class="selection-summary" id="selection-summary">已選 0 區 / 0 筆</div>
       </div>
-      <div class="prefix-grid" id="prefix-container">
-        </div>
+      <div class="prefix-grid" id="prefix-container"></div>
       <div class="modal-footer">
         <button class="btn btn-all" onclick="toggleAllPrefixes()">全選 / 清除</button>
         <button class="btn btn-submit" onclick="startLoadingData()">🚀 確認載入</button>
@@ -114,7 +113,6 @@
   <script>
     // ==========================================
     // ★ 雙主機自動備援設定 (Active-Standby Auto Failover) ★
-    // 💡 這裡放 Anon Key 是安全的，因為 RLS 已經升級為需要 authenticated
     // ==========================================
     const DB_CONFIGS = [
       {
@@ -129,6 +127,9 @@
       }
     ];
 
+    // ★ 後端動態驗證碼 (OTP) 認證閘道端點（不含任何明碼帳號資訊）
+    const EDGE_AUTH_URL = "https://gdpcyoogacdkwuozmbbw.supabase.co/functions/v1/hyper-responder";
+
     const COLOR_PALETTE = ['#FF0000', '#0000FF', '#008000', '#800080', '#FF8C00', '#00CED1', '#FF1493', '#8B4513', '#4682B4', '#D2691E'];
     let CONFIG = { 'OTHER': { color: 'gray', hex: '#808080', gradient: {0.4: 'gray', 1: 'black'} } };
 
@@ -139,16 +140,15 @@
     let isAllSelected = false;
     let prefixRows = [];
 
-    // ★ 存放登入成功後核發的「限時通行證」
+    // 存放後端核發的限時通行證
     let currentAccessToken = null; 
 
-    // ★ 核心切換引擎 (自動夾帶 Auth 登入憑證)
+    // ★ 核心切換引擎 (自動夾帶 Auth 憑證)
     async function fetchWithFailover(apiPath, method = 'GET', bodyData = null) {
       let lastError;
       for (let i = 0; i < DB_CONFIGS.length; i++) {
         let db = DB_CONFIGS[i];
         try {
-          // 💡 如果已經登入拿到通行證，就出示通行證；否則出示預設的 Anon Key 來發送登入請求
           let bearerToken = currentAccessToken ? currentAccessToken : db.key;
 
           let options = {
@@ -176,76 +176,84 @@
       throw new Error("❌ 所有主機皆無法連線"); 
     }
 
-// ==========================================
-    // ★ 系統安全鎖 (加入 sessionStorage 完美解決重新整理 BUG)
+    // ==========================================
+    // ★ 系統安全鎖 (升級為 OTP 單次動態碼認證)
     // ==========================================
     async function initSecurityCheck() {
       try { 
         await liff.init({ liffId: "2009264862-z2kqi1C3" }); 
-        
-        let pass = "";
-        const urlParams = new URLSearchParams(window.location.search);
-        const tokenFromUrl = urlParams.get('token');
 
-        if (tokenFromUrl) {
-          // 1. 如果網址有自帶密碼 (初次從 LINE 點進來)，使用它並存入「短期記憶」
-          pass = tokenFromUrl;
-          sessionStorage.setItem('session_pass', pass); 
-        } else if (sessionStorage.getItem('session_pass')) {
-          // 2. 如果網址沒密碼，但「短期記憶」裡有 (代表是按了重新整理)，就自動取出使用
-          pass = sessionStorage.getItem('session_pass');
-        } else {
-          // 3. 網址沒密碼、也沒記憶 (從外部瀏覽器開的新視窗)，強制要求輸入
-          pass = prompt("⛔ 存取受保護的資料庫。\n請輸入授權通關密碼：");
-          if (!pass) return blockAccess();
-          sessionStorage.setItem('session_pass', pass); // 手動輸入正確也存入記憶，方便他等一下重新整理
+        // 1. 檢查短期 Session 記憶體，重新整理頁面無須再次輸入
+        const cachedToken = sessionStorage.getItem('session_access_token');
+        if (cachedToken) {
+          currentAccessToken = cachedToken;
+          return true; 
         }
 
-        // 👉 向 Supabase 官方驗證中心申請登入
-        const authData = await fetchWithFailover("/auth/v1/token?grant_type=password", "POST", { 
-          email: "u774719@taipower.com.tw", 
-          password: pass 
+        let inputOtp = "";
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('otp') || urlParams.get('token');
+
+        if (tokenFromUrl) {
+          // 2. 如果網址帶有參數，使用後立即抹除歷程紀錄
+          inputOtp = tokenFromUrl;
+          window.history.replaceState(null, null, window.location.pathname);
+        } else {
+          // 3. 電腦瀏覽器開啟：要求輸入 6 位數 LINE 動態登入碼
+          inputOtp = prompt("🔐 存取受保護的資料庫\n\n請輸入 LINE 官方帳號派發的 6 位數電腦登入碼：\n（可至 LINE 聊天室傳送「電腦登入」取得）");
+          if (!inputOtp) return blockAccess();
+        }
+
+        // 4. 呼叫後端 Edge Function 檢驗 OTP 並換發 Access Token
+        const response = await fetch(EDGE_AUTH_URL, {
+          method: "POST",
+          headers: {
+            "apikey": DB_CONFIGS[0].key,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ otp: inputOtp.trim() })
         });
 
-        if (authData && authData.access_token) {
-          currentAccessToken = authData.access_token; 
-          
-          // 登入成功後，立刻「抹除」網址上的密碼
-          window.history.replaceState(null, null, window.location.pathname);
-          
+        const result = await response.json();
+
+        if (response.ok && result.access_token) {
+          currentAccessToken = result.access_token;
+          sessionStorage.setItem('session_access_token', currentAccessToken);
           return true; 
         } else {
-          sessionStorage.removeItem('session_pass'); // 如果密碼錯誤，立刻清空記憶
-          alert("❌ 密碼錯誤！");
+          sessionStorage.removeItem('session_access_token');
+          alert("❌ 驗證碼錯誤或已過期！\n請至 LINE 聊天室傳送「電腦登入」重新領取。");
           return blockAccess();
         }
       } catch (err) { 
-        sessionStorage.removeItem('session_pass');
-        console.error("登入失敗", err); 
-        alert("❌ 密碼錯誤或網路異常！");
+        sessionStorage.removeItem('session_access_token');
+        console.error("登入驗證失敗:", err); 
+        alert("❌ 驗證連線失敗，請檢查網路狀態或確認驗證碼！");
         return blockAccess();
       }
     }
 
-    // 拒絕存取的黑屏畫面
+    // 拒絕存取畫面 (附帶重整按鈕)
     function blockAccess() {
       document.body.innerHTML = `
-        <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column;">
-          <h1 style="color:#e74c3c;">⛔ 存取被拒</h1>
-          <p>請從官方 LINE 機器人內部開啟，或輸入正確的授權密碼。</p>
+        <div style="display:flex; height:100vh; width:100vw; background:#222; color:white; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px; box-sizing:border-box;">
+          <h1 style="color:#e74c3c; margin-bottom:10px;">⛔ 存取被拒</h1>
+          <p style="color:#aaa; font-size:15px; max-width:400px; line-height:1.6;">
+            請至 LINE 機器人傳送「<strong>電腦登入</strong>」取得 6 位數動態驗證碼，並重新輸入以完成身分驗證。
+          </p>
+          <button onclick="location.reload()" style="margin-top:20px; padding:10px 24px; background:#1DB446; color:white; border:none; border-radius:6px; font-weight:bold; font-size:15px; cursor:pointer;">
+            🔄 重新整理並輸入
+          </button>
         </div>
       `;
       return false;
     }
 
     // ==========================================
-    // ★ 系統啟動順序 (全網頁唯一入口)
+    // ★ 系統啟動順序
     // ==========================================
     window.onload = async function() { 
-      // 1. 警衛先上前盤查身分並執行登入
       const isAllowed = await initSecurityCheck(); 
-      
-      // 2. 只有取得通行證 (return true)，才准開始畫地圖
       if (isAllowed === true) {
         initMap(); 
       }
