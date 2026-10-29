@@ -594,9 +594,11 @@
       });
       updateSelectionSummary();
 
-      if (lastSelected.length > 0) {
-        startLoadingData();
-      }
+      // ★ 核心優化：取消開網頁自動背景載入，避免每次開網頁瞬間榨乾 Supabase 算力
+      // 保留上次選取的勾選狀態，由使用者確認後點擊「🚀 載入資料」才開始下載
+      // if (lastSelected.length > 0) {
+      //   startLoadingData();
+      // }
     }
 
     function handlePrefixChange(checkbox) {
@@ -679,7 +681,7 @@
 
       try {
         let allData = [];
-        const limit = 10000;
+        const limit = 1000;
 
         for (let i = 0; i < selectedPrefixes.length; i++) {
           let prefix = selectedPrefixes[i];
@@ -688,7 +690,7 @@
 
           while (hasMore) {
             document.getElementById('loading-text').innerHTML = `🌐 下載區段 [${prefix}] 中...<br>(累計 ${allData.length.toLocaleString()} 筆)`;
-            const apiPath = `/rest/v1/power_data?power_no=like.${prefix}*&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}&order=power_no.asc`;
+            const apiPath = `/rest/v1/power_data?power_no=like.${prefix}*&select=power_no,civil_eng,lat,lng&limit=${limit}&offset=${offset}`;
             const json = await fetchWithFailover(apiPath, "GET");
             allData = allData.concat(json);
             
